@@ -3,6 +3,7 @@ import processing.serial.*;
 final int NUM_VALUES = 200;
 final int FRAME_W = 400;
 final int FRAME_H = 400;
+final int maxValue = 255;
 
 int[] serialVal = new int[NUM_VALUES];
 Serial myPort;
@@ -33,7 +34,7 @@ void draw() {
     if(myPort.available()>0)
     {
       serialVal[curr] = myPort.read();
-      curr++;
+      curr = (curr + 1) % NUM_VALUES;
       if (curr % 5 == 0) {
         break;
       }
@@ -44,7 +45,7 @@ void draw() {
   {
     int i = (j+1+curr) % NUM_VALUES;
     fill(0);
-    rect(j*width + 50, 75, width, serialVal[i]);
+    rect(j*width + 50, 75 + (maxValue-serialVal[i]), width, serialVal[i]);
   }
 
 }
