@@ -1,6 +1,11 @@
 /*
   sensorLab
  */
+#define LM_SIZE 10
+int LM[LM_SIZE];      // LastMeasurements
+byte index = 0;
+long sum = 0;
+byte count = 0;
 
 const int sensorPinIR = A0;
 const int sensorPinPo = A1;
@@ -44,6 +49,7 @@ void loop() {
   
   // Print to serial monitor
   Serial.print("IR = ");
+  distanceIR = runningAverage(distanceIR);
   Serial.print(distanceIR);
   Serial.print("cm; ");
   Serial.print("Potent = ");
@@ -53,7 +59,7 @@ void loop() {
   Serial.print(distance);
   Serial.println("cm");
   
-  delay(1000);
+  delay(100);
 }
 
 int mapAnalog(int value) {
@@ -65,5 +71,17 @@ int mapRotary(int value) {
 }
 
 int transferIR(int voltage) {
- return (1 / (0.00023914 * voltage - 0.0100251467)) + 1;
+ return (1 / (0.0002391473 * voltage - 0.0100251467)) + 1;
 }
+
+long runningAverage(int M) {
+  // keep sum updated to improve speed.
+  sum -= LM[index];
+  LM[index] = M;
+  sum += LM[index];
+  index = (index+1) % LM_SIZE;
+  if (count < LM_SIZE) count++;
+
+  return sum / count;
+}
+
