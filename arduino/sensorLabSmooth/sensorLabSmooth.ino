@@ -74,6 +74,7 @@ int transferIR(int voltage) {
  return (1 / (0.0002391473 * voltage - 0.0100251467)) + 1;
 }
 
+// source: http://playground.arduino.cc/Main/RunningAverage
 long runningAverage(int M) {
   // keep sum updated to improve speed.
   sum -= LM[index];
