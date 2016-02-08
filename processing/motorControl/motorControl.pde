@@ -80,6 +80,8 @@ void mousePressed() {
   }
   if (rectOver) {
     // send value
+    // Str val = motorCode + value.toString();
+    // Serial.write(value);
   }
 }
 

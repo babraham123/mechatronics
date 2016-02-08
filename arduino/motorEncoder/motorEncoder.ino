@@ -3,6 +3,7 @@
 
 #include <Encoder.h>
 #include <Bounce2.h>
+#include <Servo.h>
 
 // uno: interrupt pins 2,3
 // Change these pin numbers to the pins connected to your encoder.
@@ -18,6 +19,10 @@ int limitPin = 7;
 
 // Instantiate a Bounce object
 Bounce debouncer = Bounce(); 
+
+// Instantiate servo object
+Servo servo;
+int servoAngle = 0;
 
 // Declare L298N Dual H-Bridge Motor Controller
 // Motor 1
@@ -38,6 +43,7 @@ void setup() {
   debouncer.attach(limitPin);
   debouncer.interval(5); // interval in ms
 
+  servo.attach(9);
 
   //Define L298N Dual H-Bridge Motor Controller Pins
   // pinMode(motor1I1,OUTPUT);
@@ -92,6 +98,15 @@ void loop() {
         digitalWrite(motor2I3, LOW);
         digitalWrite(motor2I4, LOW);
         Serial.println("Motor 2 Brake");
+        break;
+
+      case '7': // Increment servo angle (0-180)
+        servoAngle = servoAngle + 10;
+        if (servoAngle > 180 || servoAngle < 0) {
+          servoAngle = 0;
+        }
+        servo.write(servoAngle);
+        Serial.println("RC Servo increment");
         break;
 
       case '0': // reset
