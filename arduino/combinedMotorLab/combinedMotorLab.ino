@@ -24,11 +24,16 @@ Bounce debouncer = Bounce();
 const int limitPin = 7;
 int switchMode = HIGH;
 
+// RC Servo Motor
 Servo servo;
 const int servoPin = 9;
 int servoAngle = 0;
 
-// Declare pins for L298N Dual H-Bridge Motor Controller
+// Bipolar Stepper Motor, A4988 Stepper Driver
+const int stepperDirPin = A4;
+const int stepPin = A5;
+
+// DC Motor, L298N Dual H-Bridge Motor Controller
 // Motor 1
 // const int motor1I1 = 7;
 // const int motor1I2 = 8;
@@ -40,13 +45,10 @@ const int speedPin2 = 5;
 
 // IR proximity sensor
 const int sensorPinIR = A0;
-int valueIR = 0;
-int voltageIR = 0;
 int distanceIR = 0;
 
 // Potentiometer
 const int sensorPinPot = A1;
-int valuePot = 0;
 int degreePot = 0;
 
 void setup() {
@@ -59,6 +61,9 @@ void setup() {
   servo.attach(servoPin);
 
   setupMotor();
+
+  pinMode(stepperDirPin, OUTPUT);
+  pinMode(stepPin, OUTPUT);
 
   for (int i = 0; i < bufferLen; i++) {
     buffer[i] = 0;
@@ -78,12 +83,12 @@ void loop() {
     // message terminated by 0xFF
     while (Serial.available() > 0) {
       int cByte = Serial.read();
-      if (cByte == 255) {
+      if (cByte == 0xff) {
         char t = (char)buffer[(curr+bufferLen-2) % bufferLen];
-        int val = buffer[(curr+bufferLen-1) % bufferLen] << 2;
-        val = val + buffer[curr];
+        int val = buffer[(curr+bufferLen-1) % bufferLen] << 4;
+        val = val + (buffer[curr] & 0x0f);
         performAction(t, val);
-        // print t,val?
+
       } else {
         curr = (curr + 1) % bufferLen;
         buffer[curr] = cByte;
@@ -97,17 +102,20 @@ void loop() {
 
 void performAction(char type, int value) {
   value = constrain(value, 0, 255);
+  //Serial.print(t);
+  //Serial.print("  |  ");
+  //Serial.println(val);
 
   switch (type) {
     // Motor 2
     case 'f': // Motor 2 Forward
-      digitalWrite(motor2I3, LOW);
-      digitalWrite(motor2I4, HIGH);
+      digitalWrite(motor2I3, HIGH);
+      digitalWrite(motor2I4, LOW);
       analogWrite(speedPin2, value);
       break;
     case 'b': // Motor 2 backward
-      digitalWrite(motor2I3, HIGH);
-      digitalWrite(motor2I4, LOW);
+      digitalWrite(motor2I3, LOW);
+      digitalWrite(motor2I4, HIGH);
       analogWrite(speedPin2, value);
       break;
     case 'k': // Motor 2 brake
@@ -117,14 +125,18 @@ void performAction(char type, int value) {
       break;
 
     case 's': // Set servo angle (0-180)
-      if (value > 180 || value < 0) {
-        value = 0;
-      }
-      servo.write(value);
+      value = constrain(value, 0, 180);
+      servo.write(value); // 180-value
+      delay(15);
       break;
 
-    case 'p': // Stepper motor
-      // pass
+    case 'p': // Stepper motor forwards
+      digitalWrite(stepperDirPin, HIGH);
+      executeSteps(value);
+      break;
+    case 'q': // Stepper motor backwards
+      digitalWrite(stepperDirPin, LOW);
+      executeSteps(value);
       break;
 
     case 'r': // Reset encoders
@@ -143,6 +155,7 @@ void updateMode() {
   // LOW == depressed, on rising edge
   if (switchMode == LOW && switchNew == HIGH) {
     inputMode = (inputMode + 1) % 2;
+    performAction('r', 0);
   }
   switchMode = switchNew;
 }
@@ -154,32 +167,44 @@ void readSensors() {
   knobNew = knobEncoder.read();
   if (knobNew != knobPos) {
     // TODO: calculate stepper steps
-    performAction('p', knobNew - knobPos);
+    long diff = knobNew - knobPos;
+    char t = 'p';
+    if (diff < 0) {
+      t = 'q';
+    }
+    performAction(t, abs(diff)*20);
     knobPos = knobNew;
   }
 
-  // IR Proximity Sensor
-  valueIR = analogRead(sensorPinIR);
-  voltageIR = mapAnalog(valueIR);
-  irNew = transferIR(valueIR);
+  // IR Proximity Sensor, 10-80
+  irNew = transferIR( analogRead(sensorPinIR) );
   if (irNew != distanceIR) {
-    // TODO: calculate distance to speed
-    if (irNew < 2) {
+    distanceIR = irNew;
+    if (irNew < 15) {
       performAction('k', 0);
     } else {
-      performAction('f', irNew*20);
+      irNew = map(irNew, 10,80, 0,255);
+      performAction('f', irNew);
     }
-    distanceIR = irNew;
   }
   
   // Potentiometer
-  valuePot = analogRead(sensorPinPot);
-  potNew = mapRotary(valuePot);
-  if (potNew != degreePot) {
-    // TODO: calculate servo angle
-    performAction('s', potNew);
+  potNew = mapRotary( analogRead(sensorPinPot) );
+  if (abs(potNew - degreePot) > 5) {
     degreePot = potNew;
+    performAction('s', potNew);
   }
+}
+
+// send Stepper pulse train
+void executeSteps(int steps) {
+  for(int i = 0; i < steps; i++) {
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(500);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(500);
+  }
+  delay(100);
 }
 
 void setupMotor() {
