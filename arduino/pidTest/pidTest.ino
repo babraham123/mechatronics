@@ -6,7 +6,7 @@
 
 double setpoint = 75; 
 double input = 0, output = 0;
-double kp = 10, ki = 0.1, kd = 0.1;
+double kp = 10, ki = 0.1, kd = 0.001;
 
 long oldPos = 0;
 unsigned long oldTime = 0;
