@@ -2,7 +2,7 @@
 // Bereket Abraham
 
 #define bufferLen 3
-unsigned int buffer[bufferLen];
+int buffer[bufferLen];
 int curr = 0;
 
 void setup() {
@@ -11,15 +11,16 @@ void setup() {
   for (int i = 0; i < bufferLen; i++) {
     buffer[i] = 0;
   }
+  establishContact();
 }
 
 void loop() {
   while (Serial.available() > 0) {
-    unsigned int cByte = Serial.read();
-    Serial.println(cByte);
+    int cByte = Serial.read();
+    //Serial.println(cByte);
     if (cByte == 255) {
       char t = (char)buffer[(curr+bufferLen-2) % bufferLen];
-      unsigned int val = buffer[(curr+bufferLen-1) % bufferLen] << 4;
+      int val = buffer[(curr+bufferLen-1) % bufferLen] << 4;
       val = val + buffer[curr];
 
       performAction(t, val);
@@ -30,8 +31,16 @@ void loop() {
   }
 }
 
-void performAction(char type, unsigned int value) {
+void performAction(char type, int value) {
   Serial.print(type);
   Serial.print("  |  ");
   Serial.println(value);
 }
+
+void establishContact() {
+  while (Serial.available() <= 0) {
+    Serial.println("A");
+    delay(300);
+  }
+}
+
