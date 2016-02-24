@@ -1,21 +1,21 @@
 #include <Servo.h>
 
 Servo myservo;
-
-int potpin = 0;
+int potPin = A0;
+int servoPin = 9;
 int val;
 
 void setup() {
-  // put your setup code here, to run once:
-  myservo.attach(9);
+  Serial.begin(9600);
+  myservo.attach(servoPin);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  val = analogRead(potpin);
-  val = map(val, 0, 1023, 0, 300);
-  if (val <= 180) {
-    myservo.write(180-val);
-  }
+  val = analogRead(potPin);
+  val = map(val, 0, 1023, 0, 180);
+  val = constrain(val, 0,180);
+  myservo.write(val);
+  Serial.println(val);
   delay(15);
 }
