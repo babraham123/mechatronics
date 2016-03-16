@@ -2,32 +2,18 @@
 // Bereket Abraham
 import processing.serial.*;
 Serial myPort;
-
-float robotXOffset = 0;
-float robotYOffset = 0;
-float footXOffset = 0;
-float footYOffset = 0;
-float robotScale = 14.0/10.0;
-float robotAngle = 0;
-float robotXJoint = 0; // [0,1]
-float robotYJoint = 0; // [0,1]
-float robotZJoint = 0; // [0,1]
-float XYWidth = 0;
-float XYHeight = 0;
-float ZWidth = 0;
-float ZHeight = 0;
-boolean xFixed = false;
-boolean yFixed = false;
+Robot winBot;
+Foot footBot;
 
 void setup() {
   size(1200, 700);
-  XYWidth = (float)width * (2.0/3.0);
-  XYHeight = (float)height / 3.0;
-  ZHeight = (float)height / 2.0;
-  robotXOffset = XYWidth/2;
-  robotYOffset = (float)height/2;
-  footXOffset = (float)width * (5.0/6.0);
-  footYOffset = (float)height/4;
+  float xyWidth = (float)width * (2.0/3.0);
+  float zWidth = (float)width - xyWidth;
+  float zHeight = (float)height / 2.0;
+
+  // pass in display bounds
+  winBot = new Robot(0, 0, xyWidth, (float)height);
+  footBot = new Foot(xyWidth, 0, zWidth, zHeight);
   
   String[] ports = Serial.list();
   for (int i = 0; i < ports.length; i++) {
@@ -40,7 +26,12 @@ void draw() {
   background(50);
   mouseInput();
   serialInput();
-  drawRobot();
+
+  footBot.display();
+  footBot.drawBounds();
+  winBot.drawBounds();
+  winBot.display();
+  
   serialOutput();
 }
 
@@ -79,7 +70,7 @@ void serialInput() {
 }
 
 void serialOutput() {
-  myPort.write(str(robotZJoint*70 + 100));
+  myPort.write(str(footBot.zJoint*70 + 100));
 }
 
 void keyPressed() {
@@ -103,113 +94,163 @@ void keyPressed() {
 }
 
 void mouseInput() {
-  if (mouseX < XYWidth) {
-    robotXJoint = (float)constrain(mouseX, 0, XYWidth) / XYWidth;
-    robotYJoint = (float)constrain(mouseY, (height/2)-XYHeight, (height/2)+XYHeight);
-    robotYJoint = robotYJoint / XYHeight / 2.0;
-  } else if (mouseY < ZHeight) {
-    robotZJoint = (float)constrain(mouseY, 0, ZHeight) / ZHeight;
+  if (winBot.inRange(mouseX, mouseY)) {
+    winBot.xJoint = winBot.normalizeX(mouseX);
+    winBot.yJoint = winBot.normalizeY(mouseY);
+  } else if (footBot.inRange(mouseX, mouseY)) {
+    footBot.zJoint = footBot.normalizeY(mouseY);
   } else {
     // do something in the remaining space
   }
 }
 
-void drawRobot() {
-  drawBounds();
-  
-  pushMatrix();
-  translate(robotXOffset, robotYOffset);
-  scale(robotScale);
-  drawXYComponents();
-  popMatrix();
-  
-  pushMatrix();
-  translate(footXOffset, footYOffset);
-  scale(robotScale*2.0);
-  drawZComponents();
-  popMatrix();
+abstract class Mechanism {
+  float x, y, w, h;
+  float scale = 1.0;
+  float angle = 0;
+  float xOffset = 0;
+  float yOffset = 0;
+
+  Mechanism(float xx, float yy, float ww, float hh) {
+    x = xx;
+    y = yy;
+    w = ww;
+    h = hh;
+    xOffset = x + (w/2);
+    yOffset = y + (h/2);
+  }
+
+  void display() {
+    pushMatrix();
+    translate(xOffset, yOffset);
+    scale(scale);
+    drawComponents();
+    popMatrix();
+  }
+
+  abstract void drawComponents();
+
+  void drawBounds() {
+    fill(100);
+    rect(x, y, 20, h);
+    rect(x, y, w, 20);
+    rect(x+w-20, y, 20, h);
+    rect(x, y+h-20, w, 20);
+  }
+
+  float jointRange(float val, float range) {
+    val = (float)constrain(val*range, 0, range) - (range/2.0);
+    return val;
+  }
+
+  boolean inRange(int xi, int yi) {
+    float xj = ((float)xi) - x;
+    float yj = ((float)yi) - y;
+    return ((xj >= 0) && (yj >= 0) && (xj < w) && (yj < h));
+  }
+
+  float normalizeX(int xi) {
+    float xj = (float)constrain(xi - x - (w/2), -w/3, w/3);
+    return xj / (w/3);
+  }
+
+  float normalizeY(int yi) {
+    float yj = (float)constrain(yi - y - (h/2), -h/3, h/3);
+    return yj / (h/3);
+  }
 }
 
-void drawXYComponents() {
-  // railings
-  pushMatrix();
-  translate(0, jointRange(robotYJoint,70));
-  drawYRail();
-  popMatrix();
-  
-  pushMatrix();
-  translate(jointRange(robotXJoint,70), 0);
-  drawXRail();
-  popMatrix();
-  
-  //center box
-  fill(200);
-  rect(-35,-35, 70,70);
-  
-  // draw any shape
-  //beginShape();
-  //vertex(sx, sy);
-  //endShape(CLOSE);
+class Robot extends Mechanism {
+  float xJoint = 0; // [0,1]
+  float yJoint = 0; // [0,1]
+  boolean xFixed = false;
+  boolean yFixed = false;
+
+  Robot(float xx, float yy, float ww, float hh) {
+    super(xx, yy, ww, hh);
+    scale = ((float)min(width,height)) / 700;
+  }
+
+  @Override
+  void drawComponents() {
+    // railings
+    pushMatrix();
+    translate(0, jointRange(yJoint,70));
+    drawYRail();
+    popMatrix();
+    
+    pushMatrix();
+    translate(jointRange(xJoint,70), 0);
+    drawXRail();
+    popMatrix();
+    
+    //center box
+    fill(200);
+    rect(-35,-35, 70,70);
+    
+    // draw any shape
+    //beginShape();
+    //vertex(sx, sy);
+    //endShape(CLOSE);
+  }
+
+  void drawYRail() {
+    fill(204, 102, 0); // orange
+    rect(-26.25,-80, 3.75,160);
+    rect(26.25,-80, 3.75,160);
+    
+    rect(-35,-80, 70,10);
+    rect(-35,70, 70,10);
+  }
+
+  void drawXRail() {
+    fill(200);
+    rect(-85,-80, 15,160);
+    rect(70,-80, 15,160);
+    
+    fill(204, 102, 0);
+    rect(-80,-26.25, 160,3.75);
+    rect(-80,26.25, 160,3.75);
+    
+    rect(-80,-35, 10,70);
+    rect(70,-35, 10,70);
+  }
 }
 
-void drawYRail() {
-  fill(204, 102, 0); // orange
-  rect(-26.25,-80, 3.75,160);
-  rect(26.25,-80, 3.75,160);
-  
-  rect(-35,-80, 70,10);
-  rect(-35,70, 70,10);
+class Foot extends Mechanism {
+  float zJoint = 0; // [0,1]
+  boolean fixed = false;
+
+  Foot(float xx, float yy, float ww, float hh) {
+    super(xx, yy, ww, hh);
+    scale = ((float)min(width,height)) / 300;
+  }
+
+  @Override
+  void drawComponents() {
+    // bottom part
+    pushMatrix();
+    translate(0, jointRange(zJoint, 15));
+    drawLowerRail();
+    popMatrix();
+    
+    //top part
+    fill(200);
+    ellipse(8,-8, 16,16);
+    rect(-35,0, 70,10);
+    
+  }
+
+  void drawLowerRail() {
+    fill(200);
+    rect(0,-16, 4,41);
+    fill(204, 102, 0);
+    rect(-20,0, 3.75,25);
+    rect(20,0, 3.75,25);
+    
+    rect(-35,25, 70,5);
+    triangle(-22.5,25, -24.5,28, -20.5,28);
+    triangle(22.5,25, 20.5,28, 24.5,28);
+  }
 }
 
-void drawXRail() {
-  fill(200);
-  rect(-85,-80, 15,160);
-  rect(70,-80, 15,160);
-  
-  fill(204, 102, 0);
-  rect(-80,-26.25, 160,3.75);
-  rect(-80,26.25, 160,3.75);
-  
-  rect(-80,-35, 10,70);
-  rect(70,-35, 10,70);
-}
-
-void drawZComponents() {
-  // bottom part
-  pushMatrix();
-  translate(0, jointRange(robotZJoint, 15));
-  drawLowerRail();
-  popMatrix();
-  
-  //top part
-  fill(200);
-  ellipse(8,-8, 16,16);
-  rect(-35,0, 70,10);
-  
-}
-
-void drawLowerRail() {
-  fill(200);
-  rect(0,-16, 4,41);
-  fill(204, 102, 0);
-  rect(-20,0, 3.75,25);
-  rect(20,0, 3.75,25);
-  
-  rect(-35,25, 70,5);
-  triangle(-22.5,25, -23.5,27, -21.5,27);
-  triangle(22.5,25, 21.5,27, 23.5,27);
-}
-
-void drawBounds() {
-  fill(100);
-  rect(0,0, 20,height);
-  rect(0,0, XYWidth,20);
-  rect(XYWidth-10,0, 20,height);
-  rect(XYWidth-10,height/2, width/3,20);
-  rect(0,height-20, XYWidth,20);
-}
-
-float jointRange(float val, float range) {
-  val = (float)constrain(val*range, 0, range) - (range/2.0);
-  return val;
-}
