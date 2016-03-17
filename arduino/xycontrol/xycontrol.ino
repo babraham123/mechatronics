@@ -4,6 +4,22 @@
    for CMU Mechatronics Window Washer S16
 */
 
+/*
+   Robot Control Scheme:
+   wasd moves robot in x-y
+   i raises feet in x-axis, k lowers feet
+   o raises feet in y-axis, l lowers feet
+   invalid inputs stops all x-y motion
+*/
+
+#include <Servo.h>
+
+/* Servo Declarations */
+Servo servoWest;
+Servo servoEast;
+Servo servoNorth;
+Servo servoSouth;
+
 /* Pin Assignments */
 const int pinLimLT = 18;
 const int pinLimRT = 19;
@@ -15,8 +31,17 @@ const int L2 = 23;
 const int L3 = 24;
 const int L4 = 25;
 
+const int pinServoWest = 26;
+const int pinServoEast = 27;
+const int pinServoNorth = 28;
+const int pinServoSouth = 29;
+
 /* Global Variables */
 bool limitLT, limitRT, limitUP, limitDN;
+
+/* Global Constants */
+int servoUP = 0;
+int servoDN = 180;
 
 void setup() {
   Serial.begin(9600);
@@ -38,6 +63,11 @@ void setup() {
   digitalWrite(L2, LOW);
   digitalWrite(L3, LOW);
   digitalWrite(L4, LOW);
+
+  servoWest.attach(pinServoWest);
+  servoEast.attach(pinServoEast);
+  servoNorth.attach(pinServoNorth);
+  servoSouth.attach(pinServoSouth);
 }
 
 void loop() {
@@ -47,28 +77,52 @@ void loop() {
     inByte = Serial.read();
     Serial.println(inByte);
     switch (inByte) {
-      case 1:
+      case 97: // input character 'a'
         success = moveLT();
         if (!success) {
           Serial.println("Can't move LT");
         }
         break;
-      case 2:
+      case 100: // input character 'd'
         success = moveRT();
         if (!success) {
           Serial.println("Can't move RT");
         }
         break;
-      case 3:
+      case 119: // input character 'w'
         success = moveUP();
         if (!success) {
           Serial.println("Can't move UP");
         }
         break;
-      case 4:
+      case 115: // input character 's'
         success = moveDN();
         if (!success) {
           Serial.println("Can't move DN");
+        }
+        break;
+      case 105: // input character 'i'
+        success = liftX();
+        if (!success) {
+          Serial.println("Can't lift xFeet");
+        }
+        break;
+      case 107: // input character 'k'
+        success = lowerX();
+        if (!success) {
+          Serial.println("Can't lower xFeet");
+        }
+        break;
+      case 111: // input character 'o'
+        success = liftY();
+        if (!success) {
+          Serial.println("Can't lift yFeet");
+        }
+        break;
+      case 108: // input character 'l'
+        success = lowerY();
+        if (!success) {
+          Serial.println("Can't lower yFeet");
         }
         break;
       default:
@@ -167,4 +221,48 @@ void hitDN() {
     limitRT = true;
     stopY();
   }
+}
+
+bool liftX() {
+  int westStatus = servoWest.read();
+  int eastStatus = servoEast.read();
+  if (westStatus == servoUP && eastStatus != servoUP) {
+    servoWest.write(servoUP);
+    servoEast.write(servoUP);
+    return true;
+  }
+  return false;
+}
+
+bool liftY() {
+  int northStatus = servoNorth.read();
+  int southStatus = servoSouth.read();
+  if (northStatus != servoUP && southStatus != servoUP) {
+    servoNorth.write(servoUP);
+    servoSouth.write(servoUP);
+    return true;
+  }
+  return false;
+}
+
+bool lowerX() {
+  int eastStatus = servoEast.read();
+  int westStatus = servoWest.read();
+  if (eastStatus != servoDN && westStatus != servoDN) {
+    servoWest.write(servoDN);
+    servoEast.write(servoDN);
+    return true;
+  }
+  return false;
+}
+
+bool lowerY() {
+  int northStatus = servoNorth.read();
+  int southStatus = servoSouth.read();
+  if (northStatus != servoDN && southStatus != servoDN) {
+    servoNorth.write(servoDN);
+    servoSouth.write(servoDN);
+    return true;
+  }
+  return false;
 }
