@@ -7,5 +7,10 @@ enum State{
   lowerX,
   liftY,
   lowerY,
-  stopALL
+  stopALL,
+  stopXY,
+  stopUD,
+  stopLR,
+  switchXY,
+  switchYX
 };
