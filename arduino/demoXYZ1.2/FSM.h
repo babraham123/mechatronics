@@ -1,0 +1,15 @@
+enum State{
+  moveUP,
+  moveUPedge,
+  moveDN,
+  moveDNedge,
+  moveLT,
+  moveRT,
+  liftU,
+  lowerU,
+  liftY,
+  lowerY,
+  stopALL,
+  switchXY,
+  switchYX,
+};
