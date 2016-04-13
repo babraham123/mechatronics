@@ -4,6 +4,8 @@ import processing.serial.*;
 Serial myPort;
 Robot winBot;
 Foot footBot;
+Graph rtPlot;
+final int NUM_VALUES = 200;
 
 void setup() {
   size(1200, 700);
@@ -251,6 +253,42 @@ class Foot extends Mechanism {
     rect(-35,25, 70,5);
     triangle(-22.5,25, -24.5,28, -20.5,28);
     triangle(22.5,25, 20.5,28, 24.5,28);
+  }
+}
+
+class Graph {
+  float x, y, w, h;
+  float scale = 1.0;
+  int[] serialVal = new int[NUM_VALUES];
+  int curr = 0;
+  int maxValue = 255;
+
+  Mechanism(float xx, float yy, float ww, float hh) {
+    x = xx;
+    y = yy;
+    w = ww;
+    h = hh;
+    for (int j = 0; j < NUM_VALUES; j++) {
+      serialVal[j] = 0;
+    }
+  }
+
+  void display() {
+    pushMatrix();
+    translate(xOffset, yOffset);
+    scale(scale);
+    drawGraph();
+    popMatrix();
+  }
+
+  void drawGraph() {
+    fill(0);
+    for (int j = 0; j < NUM_VALUES; j++)
+    {
+      int i = (j+1+curr) % NUM_VALUES;
+      fill(0);
+      rect(j*width + 10, 15 + (maxValue-serialVal[i]), width, serialVal[i]);
+    }
   }
 }
 

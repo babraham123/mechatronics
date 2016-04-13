@@ -12,4 +12,6 @@ enum State{
   stopALL,
   switchXY,
   switchYX,
+  raiseX,
+  lowerX,
 };

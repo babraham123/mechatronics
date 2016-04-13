@@ -8,8 +8,8 @@
 /*
    Robot Control Scheme:
    wasd moves robot in x-y
-   i raises feet in x-axis, k lowers feet
-   o raises feet in y-axis, l lowers feet
+   k raises feet in x-axis, l lowers feet
+   i raises feet in y-axis, o lowers feet
    p prints pressure data
    invalid inputs stops all motion
 */
@@ -134,6 +134,14 @@ void loop() {
         state = switchYX;
         nextState = stopALL;
         break;
+      case 107: // input character 'k'
+        state = raiseX;
+        nextState = stopALL;
+        break;
+      case 108: // input character 'l'
+        state = lowerX;
+        nextState = stopALL;
+        break;
       case 112: // input character 'p', display pressure data
         displayPressure();
         break;
@@ -148,7 +156,7 @@ void loop() {
   }
 
   long current;
-  bool up, dn;
+  bool up, dn, rt, lt;
 
   switch (state) {
     case moveUP:
@@ -272,6 +280,10 @@ void loop() {
       }
 
     case switchXY:
+      // lower X
+      // engage X cups
+      // release Y cups
+      // raise Y cups
       up = setUP(400);
       dn = setDN(400);
       if (up && dn) {
@@ -284,6 +296,24 @@ void loop() {
       up = setUP(235);
       dn = setDN(235);
       if (up && dn) {
+        state = nextState;
+        nextState = stopALL;
+      }
+      break;
+
+    case lowerX:
+      lt = setLT(235);
+      rt = setRT(235);
+      if (lt && rt) {
+        state = nextState;
+        nextState = stopALL;
+      }
+      break;
+
+    case raiseX:
+      lt = setLT(350);
+      rt = setRT(350);
+      if (lt && rt) {
         state = nextState;
         nextState = stopALL;
       }
@@ -354,16 +384,19 @@ bool setDN(long target) {
 }
 
 bool setLT(long target) {
-  long echo = sonarLT.ping_median(3);
+  long echo = sonarLT.ping_median(5);
   long distance = sonarLT.convert_cm(echo);
-  Serial.print("LT: ");
+  Serial.print("echoLT: ");
+  Serial.print(echo);
+  Serial.print("ms ");
+  Serial.print("distanceLT: ");
   Serial.print(distance);
-  Serial.print("cm ");
-  if (target > distance) {
+  Serial.println("cm");
+  if (target - echo > 10) {
     digitalWrite(L1, HIGH);
     digitalWrite(L2, LOW);
     return false;
-  } else if (target < distance) {
+  } else if (target - echo < -20) {
     digitalWrite(L1, LOW);
     digitalWrite(L2, HIGH);
     return false;
@@ -375,16 +408,19 @@ bool setLT(long target) {
 }
 
 bool setRT(long target) {
-  long echo = sonarRT.ping_median(3);
+  long echo = sonarRT.ping_median(5);
   long distance = sonarRT.convert_cm(echo);
-  Serial.print(" RT: ");
+  Serial.print("echoRT: ");
+  Serial.print(echo);
+  Serial.print("ms ");
+  Serial.print("distanceRT: ");
   Serial.print(distance);
-  Serial.println("cm ");
-  if (target > distance) {
+  Serial.println("cm");
+  if (target - echo > 10) {
     digitalWrite(R1, HIGH);
     digitalWrite(R2, LOW);
     return false;
-  } else if (target < distance) {
+  } else if (target - echo < -20) {
     digitalWrite(R1, LOW);
     digitalWrite(R2, HIGH);
     return false;
