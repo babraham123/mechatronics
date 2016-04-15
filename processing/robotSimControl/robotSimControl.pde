@@ -1,10 +1,14 @@
-// Z Motion GUI
+// Icarus Window Washer GUI
+// Mechatronic Design
 // Bereket Abraham
+
 import processing.serial.*;
 Serial myPort;
 Robot winBot;
 Foot footBot;
-Graph rtPlot;
+Graph vacuumX, vacuumY, positionX, positionY;
+Graph ultrasonicN, ultrasonicS, ultrasonicE, ultrasonicW;
+Graph currGraph;
 final int NUM_VALUES = 200;
 
 void setup() {
@@ -12,11 +16,23 @@ void setup() {
   float xyWidth = (float)width * (2.0/3.0);
   float zWidth = (float)width - xyWidth;
   float zHeight = (float)height / 2.0;
+  float gHeight = (float)height - zHeight;
 
   // pass in display bounds
   winBot = new Robot(0, 0, xyWidth, (float)height);
   footBot = new Foot(xyWidth, 0, zWidth, zHeight);
   
+  // initialize real time graphs
+  vacuumX = new Graph(xyWidth, zHeight, zWidth, gHeight, "X Vacuum Pressure");
+  vacuumY = new Graph(xyWidth, zHeight, zWidth, gHeight, "Y Vacuum Pressure");
+  positionX = new Graph(xyWidth, zHeight, zWidth, gHeight, "X Railing Position");
+  positionY = new Graph(xyWidth, zHeight, zWidth, gHeight, "Y Railing Position");
+  ultrasonicN = new Graph(xyWidth, zHeight, zWidth, gHeight, "North Distance Sensor");
+  ultrasonicS = new Graph(xyWidth, zHeight, zWidth, gHeight, "South Distance Sensor");
+  ultrasonicE = new Graph(xyWidth, zHeight, zWidth, gHeight, "East Distance Sensor");
+  ultrasonicW = new Graph(xyWidth, zHeight, zWidth, gHeight, "West Distance Sensor");
+  currGraph = vacuumX;
+
   String[] ports = Serial.list();
   for (int i = 0; i < ports.length; i++) {
     println(ports[i]);
@@ -29,66 +45,109 @@ void draw() {
   mouseInput();
   serialInput();
 
+  currGraph.display();
   footBot.display();
   footBot.drawBounds();
   winBot.drawBounds();
   winBot.display();
-  
-  serialOutput();
 }
 
 void serialInput() {
-  while ( myPort.available() > 0) 
+  int k = 0;
+  while (myPort.available() > 0) 
   {
     String val = myPort.readStringUntil('\n');
-    if(val == null || val.length() < 2) {continue;};
+    if (val == null || val.length() < 2) { continue; }
     println(val);
     int nVal = Integer.parseInt(val.substring(1, val.length()-1));
     switch (val.charAt(0)) {
+      case 'u':
+        vacuumX.update(nVal);
+        break;
+      case 'v':
+        vacuumY.update(nVal);
+        break;
+      case 'x':
+        positionX.update(nVal);
+        break;
+      case 'y':
+        positionY.update(nVal);
+        break;
       case 'n':
-        if (nVal < 10) {
-          println("North near edge");
-        }
+        ultrasonicN.update(nVal);
         break;
       case 's':
-        if (nVal < 10) {
-          println("South near edge");
-        }
-        break;
-      case 'w':
-        if (nVal < 10) {
-          println("West near edge");
-        }
+        ultrasonicS.update(nVal);
         break;
       case 'e':
-        if (nVal < 10) {
-          println("East near edge");
-        }
+        ultrasonicE.update(nVal);
+        break;
+      case 'w':
+        ultrasonicW.update(nVal);
         break;
       default:
         break;
     }
+    k++;
+    if (k > 5) { break; }
   }
 }
 
-void serialOutput() {
-  myPort.write(str(footBot.zJoint*70 + 100));
+void serialOutput(String msg) {
+  myPort.write(msg);
 }
 
 void keyPressed() {
   switch (key) {
-    case 'r':
-      // reset offset to 0
-      break;
-    case 's':
-      // send joint values to robot
-      break;
-    case 'x':
-      // fix X rail
-      break;
-    case 'y':
-      // fix y rail
-      break;
+      case 'u':
+        currGraph = vacuumX;
+        break;
+      case 'v':
+        currGraph = vacuumY;
+        break;
+      case 'x':
+        currGraph = positionX;
+        break;
+      case 'y':
+        currGraph = positionY;
+        break;
+      case 'n':
+        currGraph = ultrasonicN;
+        break;
+      case 's':
+        currGraph = ultrasonicS;
+        break;
+      case 'e':
+        currGraph = ultrasonicE;
+        break;
+      case 'w':
+        currGraph = ultrasonicW;
+        break;
+      // testing
+      case 'a':
+        winBot.edgeN = !winBot.edgeN;
+        currGraph.update(50);
+        break;
+      case 'b':
+        winBot.edgeW = !winBot.edgeW;
+        currGraph.update(100);
+        break;
+      case 'c':
+        winBot.edgeE = !winBot.edgeE;
+        currGraph.update(200);
+        break;
+      case 'd':
+        winBot.edgeS = !winBot.edgeS;
+        break;
+      case 'f':
+        winBot.xFixed = !winBot.xFixed;
+        break;
+      case 'g':
+        winBot.yFixed = !winBot.yFixed;
+        break;
+      case 'h':
+        footBot.fixed = !footBot.fixed;
+        break;
     default:
       println("Unknown key");
       break;
@@ -112,6 +171,10 @@ abstract class Mechanism {
   float angle = 0;
   float xOffset = 0;
   float yOffset = 0;
+  boolean edgeN = false;
+  boolean edgeS = false;
+  boolean edgeE = false;
+  boolean edgeW = false;
 
   Mechanism(float xx, float yy, float ww, float hh) {
     x = xx;
@@ -134,9 +197,19 @@ abstract class Mechanism {
 
   void drawBounds() {
     fill(100);
+    if (edgeW) { fill(255,0,0); }
     rect(x, y, 20, h);
+
+    fill(100);
+    if (edgeN) { fill(255,0,0); }
     rect(x, y, w, 20);
+
+    fill(100);
+    if (edgeE) { fill(255,0,0); }
     rect(x+w-20, y, 20, h);
+
+    fill(100);
+    if (edgeS) { fill(255,0,0); }
     rect(x, y+h-20, w, 20);
   }
 
@@ -170,7 +243,7 @@ class Robot extends Mechanism {
 
   Robot(float xx, float yy, float ww, float hh) {
     super(xx, yy, ww, hh);
-    scale = ((float)min(width,height)) / 700;
+    scale = ((float)min(width,height)) / 350;
   }
 
   @Override
@@ -201,12 +274,15 @@ class Robot extends Mechanism {
     rect(-26.25,-80, 3.75,160);
     rect(26.25,-80, 3.75,160);
     
+    fill(170);
+    if (yFixed) { fill(255,0,0); }
     rect(-35,-80, 70,10);
     rect(-35,70, 70,10);
   }
 
   void drawXRail() {
-    fill(200);
+    fill(170);
+    if (xFixed) { fill(255,0,0); }
     rect(-85,-80, 15,160);
     rect(70,-80, 15,160);
     
@@ -214,6 +290,7 @@ class Robot extends Mechanism {
     rect(-80,-26.25, 160,3.75);
     rect(-80,26.25, 160,3.75);
     
+    fill(200);
     rect(-80,-35, 10,70);
     rect(70,-35, 10,70);
   }
@@ -225,7 +302,7 @@ class Foot extends Mechanism {
 
   Foot(float xx, float yy, float ww, float hh) {
     super(xx, yy, ww, hh);
-    scale = ((float)min(width,height)) / 300;
+    scale = ((float)min(width,height)) / 200;
   }
 
   @Override
@@ -250,6 +327,8 @@ class Foot extends Mechanism {
     rect(-20,0, 3.75,25);
     rect(20,0, 3.75,25);
     
+    fill(170);
+    if (fixed) { fill(255,0,0); }
     rect(-35,25, 70,5);
     triangle(-22.5,25, -24.5,28, -20.5,28);
     triangle(22.5,25, 20.5,28, 24.5,28);
@@ -259,15 +338,22 @@ class Foot extends Mechanism {
 class Graph {
   float x, y, w, h;
   float scale = 1.0;
+  float barWidth = 10;
   int[] serialVal = new int[NUM_VALUES];
   int curr = 0;
   int maxValue = 255;
+  int dataColor = 0;
+  String title = "Sensor Value";
 
-  Mechanism(float xx, float yy, float ww, float hh) {
+  Graph(float xx, float yy, float ww, float hh, String ttitle) {
     x = xx;
     y = yy;
     w = ww;
     h = hh;
+    title = ttitle;
+    barWidth = w / (float) NUM_VALUES;
+    setMaxValue(255);
+
     for (int j = 0; j < NUM_VALUES; j++) {
       serialVal[j] = 0;
     }
@@ -275,20 +361,34 @@ class Graph {
 
   void display() {
     pushMatrix();
-    translate(xOffset, yOffset);
-    scale(scale);
+    translate(x, y);
     drawGraph();
     popMatrix();
   }
 
   void drawGraph() {
-    fill(0);
+    fill(dataColor);
     for (int j = 0; j < NUM_VALUES; j++)
     {
       int i = (j+1+curr) % NUM_VALUES;
       fill(0);
-      rect(j*width + 10, 15 + (maxValue-serialVal[i]), width, serialVal[i]);
+      rect(j*barWidth, 30 + scale*(maxValue-serialVal[i]), barWidth, scale*serialVal[i]);
     }
+
+    fill(255,255,255);
+    textSize(24);
+    text(title, w/3, 20);
+    text(str(maxValue), 5, 20);
+  }
+
+  void update(int reading) {
+    serialVal[curr] = reading;
+    curr = (curr + 1) % NUM_VALUES;
+  }
+
+  void setMaxValue(int maxVal) {
+    maxValue = maxVal;
+    scale = (h-30) / (float) maxValue;
   }
 }
 
