@@ -448,12 +448,12 @@ bool moveMidX() {
   }
 
   if (target - xPosition > 0) {
-    digitalWrite(X1, LOW);
-    digitalWrite(X2, HIGH);
-    return false;
-  } else if (target - xPosition < 0) {
     digitalWrite(X1, HIGH);
     digitalWrite(X2, LOW);
+    return false;
+  } else if (target - xPosition < 0) {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, HIGH);
     return false;
   } else {
     digitalWrite(X1, LOW);
