@@ -61,6 +61,7 @@ const long hiThresh = 10;
 const long loThresh = -25;
 const long loTarget = 245;
 const long hiTarget = 265;
+const float pressureThreshold = -15.0;
 
 /********** States ***********/
 // Performs actions and state transitions. State can override its manager 
@@ -92,6 +93,7 @@ int M_TRANSLATE_RT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X
 int M_TRANSLATE_UP[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_UP, -1};
 int M_TRANSLATE_DN[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, -1};
 int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_LIFT_Y, S_MOVE_LT, -1};
+int *MANAGERS[5] = [M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN];
 // TODO: M_TURN_DN_LT, M_TURN_DN_RT, M_TURN_LT_DN, M_TURN_LT_UP
 // TODO: M_DIVIDER_DN, M_DIVIDER_LT 
 // (robot starts in upper right??)
@@ -348,7 +350,7 @@ bool waitVacuumX() {
     Serial.println(pressure);
   }
 
-  if (pressure < 0) {
+  if (pressure < pressureThreshold) {
     return true;
   } else {
     return false;
@@ -365,7 +367,7 @@ bool waitVacuumY() {
     Serial.println(pressure);
   }
 
-  if (pressure < 0) {
+  if (pressure < pressureThreshold) {
     return true;
   } else {
     return false;
@@ -437,8 +439,27 @@ bool moveDN() {
 }
 
 bool moveMidX() {
-  // TODO
-  return true;
+  int target = xExtreme / 2;
+  xPosition = xEncoder.read();
+
+  if (currDisplayMode == D_GUI) {
+    Serial.print("x");
+    Serial.println(xPosition);
+  }
+
+  if (target - xPosition > 0) {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, HIGH);
+    return false;
+  } else if (target - xPosition < 0) {
+    digitalWrite(X1, HIGH);
+    digitalWrite(X2, LOW);
+    return false;
+  } else {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, LOW);
+    return true;
+  }
 }
 
 bool moveMidY() {
@@ -688,14 +709,14 @@ void stopAllMotors() {
 void hitLT() {
   digitalWrite(X1, LOW);
   digitalWrite(X2, LOW);
-  // xExtreme = xEncoder.read();
+  xExtreme = xEncoder.read();
   return;
 }
 
 void hitRT() {
   digitalWrite(X1, LOW);
   digitalWrite(X2, LOW);
-  // xEncoder.write(0);
+  xEncoder.write(0);
   return;
 }
 
