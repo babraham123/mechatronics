@@ -88,16 +88,24 @@ const int S_WAIT_VAC_Y = 12;
 // the middle of a sequence
 volatile int *currManager;
 volatile int currIndex;
+// linear motion
 int M_TRANSLATE_LT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_LT, -1};
 int M_TRANSLATE_RT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, -1};
 int M_TRANSLATE_UP[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_UP, -1};
 int M_TRANSLATE_DN[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, -1};
 int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_LIFT_Y, S_MOVE_LT, -1};
-int *MANAGERS[5] = [M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN];
-// TODO: M_TURN_DN_LT, M_TURN_DN_RT, M_TURN_LT_DN, M_TURN_LT_UP
+// turns, robot zigzags against divider
+// when moving down, if barrier transition to linear motion
+int M_TURN_X_LR[33]={S_MOVE_LT,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_CENTER_X,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_CENTER_Y, -1}; // M_TRANSLATE_RT};
+int M_TURN_X_RL[33]={S_MOVE_RT,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_CENTER_X,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_CENTER_Y, -1}; //,M_TRANSLATE_LT};
+// turns, robot zigzags with divider (not used)
+int M_TURN_Y_LR[33]={S_MOVE_DN,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_CENTER_Y,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_CENTER_X, -1}; //,M_TRANSLATE_UP};
+int M_TURN_Y_RL[33]={S_MOVE_UP,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_CENTER_Y,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_CENTER_X, -1}; //,M_TRANSLATE_DN};
+
 // TODO: M_DIVIDER_DN, M_DIVIDER_LT 
 // (robot starts in upper right??)
 int M_STOP[2] = {S_STOP_ALL, -1};
+int *MANAGERS[10] = [M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN, M_DEBUG_LT, M_TURN_X_LR, M_TURN_X_RL, M_TURN_Y_LR, M_TURN_Y_RL, M_STOP];
 
 /********** Display Modes ***********/
 // Determines what is outputted to the Serial port by the actions
@@ -177,6 +185,18 @@ void loop() {
       case 's':
         currIndex = -1;
         currManager = M_TRANSLATE_DN;
+        incrementState();
+        break;
+
+      case 'v':
+        currIndex = -1;
+        currManager = M_TURN_X_LR;
+        incrementState();
+        break;
+
+      case 'b':
+        currIndex = -1;
+        currManager = M_TURN_X_RL;
         incrementState();
         break;
 
