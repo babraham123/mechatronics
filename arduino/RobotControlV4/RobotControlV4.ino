@@ -5,7 +5,7 @@
 
 /* Manual Control Scheme
 
-   Movement: WASD, x to center Y
+   Movement: WASD, y centers Y
    X legs: i to raise, k to lower
    Y legs: o to raise, l to lower
    Pressure: p to display pressure
