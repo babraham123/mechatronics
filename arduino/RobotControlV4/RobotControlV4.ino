@@ -55,7 +55,8 @@ NewPing sonarRT(trigRT, echoRT, 8);
 NewPing sonarUP(trigUP, echoUP, 8);
 NewPing sonarDN(trigDN, echoDN, 8);
 
-Encoder yEncoder(3, 2);
+Encoder yEncoder(3, );
+Encoder xEncoder(2, );
 
 const long hiThresh = 10;
 const long loThresh = -25;
