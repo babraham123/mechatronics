@@ -91,6 +91,7 @@ int M_TRANSLATE_LT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X
 int M_TRANSLATE_RT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, -1};
 int M_TRANSLATE_UP[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_UP, -1};
 int M_TRANSLATE_DN[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, -1};
+int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_LIFT_Y, S_MOVE_LT, -1};
 // TODO: M_TURN_DN_LT, M_TURN_DN_RT, M_TURN_LT_DN, M_TURN_LT_UP
 // TODO: M_DIVIDER_DN, M_DIVIDER_LT 
 // (robot starts in upper right??)
@@ -219,9 +220,16 @@ void loop() {
         currDisplayMode = D_DEBUG;
         break;
 
+      case 'g':
+        currIndex = -1;
+        currManager = M_DEBUG_LT;
+        incrementState();
+        break;
+
       default:
-        currState = S_STOP_ALL;
+        currIndex = -1;
         currManager = M_STOP;
+        incrementState();
         break;
     }
   }
