@@ -1,7 +1,7 @@
 /* Icarus Window Washer, V4.0
- * Mechatronic Design
- * Roy Shin, Bereket Abraham
- */
+   Mechatronic Design
+   Roy Shin, Bereket Abraham
+*/
 
 /* Manual Control Scheme
 
@@ -25,15 +25,15 @@ const int X2 = 23;
 const int Y1 = 24;
 const int Y2 = 25;
 
-const int L1 = 9;
-const int L2 = 8;
-const int R1 = 11;
-const int R2 = 10;
+const int L1 = 11;
+const int L2 = 10;
+const int R1 = 13;
+const int R2 = 12;
 
-const int U1 = 5;
-const int U2 = 4;
-const int D1 = 7;
-const int D2 = 6;
+const int U1 = 7;
+const int U2 = 6;
+const int D1 = 9;
+const int D2 = 8;
 
 const int trigLT = 52;
 const int echoLT = 53;
@@ -55,7 +55,8 @@ NewPing sonarRT(trigRT, echoRT, 8);
 NewPing sonarUP(trigUP, echoUP, 8);
 NewPing sonarDN(trigDN, echoDN, 8);
 
-Encoder yEncoder(3, 2);
+Encoder yEncoder(2, 4);
+Encoder xEncoder(3, 5);
 
 const long hiThresh = 10;
 const long loThresh = -25;
@@ -63,9 +64,12 @@ const long loTarget = 245;
 const long hiTarget = 265;
 const float pressureThreshold = -15.0;
 
+const bool verticalOrientation = false;
+// true means that the X railing is parallel with the X axis
+
 /********** States ***********/
-// Performs actions and state transitions. State can override its manager 
-// in case of failure / unexpected conditions. State can transition to a 
+// Performs actions and state transitions. State can override its manager
+// in case of failure / unexpected conditions. State can transition to a
 // different manager as well.
 volatile int currState;
 volatile unsigned long stateCounter; // # of cycles since currState started
@@ -468,12 +472,12 @@ bool moveMidX() {
   }
 
   if (target - xPosition > 0) {
-    digitalWrite(X1, LOW);
-    digitalWrite(X2, HIGH);
-    return false;
-  } else if (target - xPosition < 0) {
     digitalWrite(X1, HIGH);
     digitalWrite(X2, LOW);
+    return false;
+  } else if (target - xPosition < 0) {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, HIGH);
     return false;
   } else {
     digitalWrite(X1, LOW);
@@ -785,4 +789,3 @@ void displayUltrasonic() {
   Serial.println(echoDN);
   return;
 }
-
