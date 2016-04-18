@@ -1,7 +1,7 @@
 /* Icarus Window Washer, V4.0
- * Mechatronic Design
- * Roy Shin, Bereket Abraham
- */
+   Mechatronic Design
+   Roy Shin, Bereket Abraham
+*/
 
 /* Manual Control Scheme
 
@@ -25,15 +25,15 @@ const int X2 = 23;
 const int Y1 = 24;
 const int Y2 = 25;
 
-const int L1 = 9;
-const int L2 = 8;
-const int R1 = 11;
-const int R2 = 10;
+const int L1 = 11;
+const int L2 = 10;
+const int R1 = 13;
+const int R2 = 12;
 
-const int U1 = 5;
-const int U2 = 4;
-const int D1 = 7;
-const int D2 = 6;
+const int U1 = 7;
+const int U2 = 6;
+const int D1 = 9;
+const int D2 = 8;
 
 const int trigLT = 52;
 const int echoLT = 53;
@@ -55,8 +55,8 @@ NewPing sonarRT(trigRT, echoRT, 8);
 NewPing sonarUP(trigUP, echoUP, 8);
 NewPing sonarDN(trigDN, echoDN, 8);
 
-Encoder yEncoder(3, );
-Encoder xEncoder(2, );
+Encoder yEncoder(2, 4);
+Encoder xEncoder(3, 5);
 
 const long hiThresh = 10;
 const long loThresh = -25;
@@ -65,8 +65,8 @@ const long hiTarget = 265;
 const float pressureThreshold = -15.0;
 
 /********** States ***********/
-// Performs actions and state transitions. State can override its manager 
-// in case of failure / unexpected conditions. State can transition to a 
+// Performs actions and state transitions. State can override its manager
+// in case of failure / unexpected conditions. State can transition to a
 // different manager as well.
 volatile int currState;
 volatile unsigned long stateCounter; // # of cycles since currState started
@@ -94,9 +94,9 @@ int M_TRANSLATE_RT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X
 int M_TRANSLATE_UP[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_UP, -1};
 int M_TRANSLATE_DN[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, -1};
 int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_LIFT_Y, S_MOVE_LT, -1};
-int *MANAGERS[5] = [M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN];
+int *MANAGERS[5] = {M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN};
 // TODO: M_TURN_DN_LT, M_TURN_DN_RT, M_TURN_LT_DN, M_TURN_LT_UP
-// TODO: M_DIVIDER_DN, M_DIVIDER_LT 
+// TODO: M_DIVIDER_DN, M_DIVIDER_LT
 // (robot starts in upper right??)
 int M_STOP[2] = {S_STOP_ALL, -1};
 
@@ -766,4 +766,3 @@ void displayUltrasonic() {
   Serial.println(echoDN);
   return;
 }
-
