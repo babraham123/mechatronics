@@ -58,10 +58,6 @@ NewPing sonarDN(trigDN, echoDN, 8);
 Encoder yEncoder(2, 4);
 Encoder xEncoder(3, 5);
 
-const long hiThresh = 10;
-const long loThresh = -25;
-const long loTarget = 245;
-const long hiTarget = 265;
 const float pressureThreshold = -7.0;
 
 const bool longCupsVertical = true;
@@ -80,14 +76,16 @@ const int S_MOVE_RT = 1;
 const int S_MOVE_UP = 2;
 const int S_MOVE_DN = 3;
 const int S_LOWER_X = 4;
-const int S_LIFT_X = 5;
-const int S_LOWER_Y = 6;
-const int S_LIFT_Y = 7;
-const int S_STOP_ALL = 8;
-const int S_CENTER_X = 9;
-const int S_CENTER_Y = 10;
-const int S_WAIT_VAC_X = 11;
-const int S_WAIT_VAC_Y = 12;
+const int S_LIFT_X_LO = 5;
+const int S_LIFT_X_HI = 6;
+const int S_LOWER_Y = 7;
+const int S_LIFT_Y_LO = 8;
+const int S_LIFT_Y_HI = 9;
+const int S_STOP_ALL = 10;
+const int S_CENTER_X = 11;
+const int S_CENTER_Y = 12;
+const int S_WAIT_VAC_X = 13;
+const int S_WAIT_VAC_Y = 14;
 
 /********** Managers ***********/
 // A sequence of states that repeats in a loop. Manager can be started in
@@ -95,20 +93,51 @@ const int S_WAIT_VAC_Y = 12;
 volatile int *currManager;
 volatile int currIndex;
 // linear motion
-int M_TRANSLATE_LT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_LT, -1}; // loops back around
-int M_TRANSLATE_RT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, -2};
-int M_TRANSLATE_UP[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_UP, -3};
-int M_TRANSLATE_DN[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, -4};
-int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_LIFT_Y, S_MOVE_LT, -5};
+int M_TRANSLATE_LT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_LT, -1}; // loops back around
+int M_TRANSLATE_RT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT, -2};
+int M_TRANSLATE_UP[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_UP, -3};
+int M_TRANSLATE_DN[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN, -4};
+int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X_LO, S_MOVE_RT, S_LOWER_X, S_LIFT_Y_LO, S_MOVE_LT, -5};
+
 // turns, robot zigzags against divider
 // when moving down, if barrier transition to linear motion
-int M_TURN_X_LR[35]={S_MOVE_LT,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_CENTER_X,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_CENTER_Y, -2}; // M_TRANSLATE_RT
-int M_TURN_X_RL[35]={S_MOVE_RT,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_CENTER_X,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_CENTER_Y, -1}; // M_TRANSLATE_LT
-// turns, robot zigzags with divider (not used)
-int M_TURN_Y_LR[35]={S_MOVE_DN,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_CENTER_Y,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_CENTER_X, -3}; // M_TRANSLATE_UP
-int M_TURN_Y_RL[35]={S_MOVE_UP,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_CENTER_Y,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_CENTER_X, -4}; // M_TRANSLATE_DN
+int M_TURN_X_LR[35] = {S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_CENTER_X, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO,
+                       S_MOVE_DN, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN,
+                       S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN, S_LOWER_X,
+                       S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_CENTER_Y, -2
+                      }; // M_TRANSLATE_RT
 
-// TODO: M_DIVIDER_DN, M_DIVIDER_LT 
+int M_TURN_X_RL[35] = {S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_CENTER_X, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO,
+                       S_MOVE_DN, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN,
+                       S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN, S_LOWER_X,
+                       S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_CENTER_Y, -1
+                      }; // M_TRANSLATE_LT
+
+// turns, robot zigzags with divider (not used)
+int M_TURN_Y_LR[35] = {S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_CENTER_Y, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO,
+                       S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT,
+                       S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT, S_LOWER_Y,
+                       S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_CENTER_X, -3
+                      }; // M_TRANSLATE_UP
+
+int M_TURN_Y_RL[35] = {S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_CENTER_Y, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO,
+                       S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT,
+                       S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT, S_LOWER_Y,
+                       S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_CENTER_X, -4
+                      }; // M_TRANSLATE_DN
+
+// TODO: M_DIVIDER_DN, M_DIVIDER_RT
+int M_DIVIDER_DN[21] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_CENTER_Y,
+                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_MOVE_DN,
+                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_CENTER_Y, -1
+                       };
+
+int M_DIVIDER_RT[25] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_MOVE_LT,
+                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_CENTER_X, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_MOVE_LT,
+                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_CENTER_X, -2
+                       };
+
+
 // (robot starts in upper right??)
 int M_STOP[2] = {S_STOP_ALL, -10};
 // do not change order, only append to the end
@@ -124,6 +153,7 @@ const int D_DEBUG = 2;
 /* Global Variables */
 volatile bool limitLT, limitRT, limitUP, limitDN;
 volatile int yExtreme, yPosition, xExtreme, xPosition;
+volatile bool edgeDetected;
 
 void setup() {
   Serial.begin(9600);
@@ -132,6 +162,7 @@ void setup() {
   currIndex = 0;
   stateCounter = 0;
   currManager = M_STOP;
+  edgeDetected = false;
 
   pinMode(pinLimLT, INPUT);
   pinMode(pinLimRT, INPUT);
@@ -208,7 +239,7 @@ void loop() {
         break;
 
       case 'i':
-        currState = S_LIFT_X;
+        currState = S_LIFT_X_LO;
         currManager = M_STOP;
         break;
 
@@ -218,7 +249,7 @@ void loop() {
         break;
 
       case 'o':
-        currState = S_LIFT_Y;
+        currState = S_LIFT_Y_LO;
         currManager = M_STOP;
         break;
 
@@ -301,10 +332,17 @@ void loop() {
       }
       break;
 
-    case S_LIFT_X:
+    case S_LIFT_X_LO:
       digitalWrite(xValve, HIGH);
+      if (liftCupsX(false)) {
+        digitalWrite(xValve, LOW);
+        incrementState();
+      }
+      break;
 
-      if (liftCupsX()) {
+    case S_LIFT_X_HI:
+      digitalWrite(xValve, HIGH);
+      if (liftCupsX(true)) {
         digitalWrite(xValve, LOW);
         incrementState();
       }
@@ -312,16 +350,22 @@ void loop() {
 
     case S_LOWER_X:
       digitalWrite(xValve, LOW);
-
       if (lowerCupsX()) {
         incrementState();
       }
       break;
 
-    case S_LIFT_Y:
+    case S_LIFT_Y_LO:
       digitalWrite(yValve, HIGH);
+      if (liftCupsY(false)) {
+        digitalWrite(yValve, LOW);
+        incrementState();
+      }
+      break;
 
-      if (liftCupsY()) {
+    case S_LIFT_Y_HI:
+      digitalWrite(yValve, HIGH);
+      if (liftCupsY(false)) {
         digitalWrite(yValve, LOW);
         incrementState();
       }
@@ -329,7 +373,6 @@ void loop() {
 
     case S_LOWER_Y:
       digitalWrite(yValve, LOW);
-
       if (lowerCupsY()) {
         incrementState();
       }
@@ -362,7 +405,7 @@ void incrementState() {
   currState = *(currManager + currIndex);
   if (currState < 0) {
     currIndex = 0;
-    currManager = MANAGERS[(-1*currState) - 1];
+    currManager = MANAGERS[(-1 * currState) - 1];
     currState = *currManager;
   }
   stateCounter = 0;
@@ -370,28 +413,59 @@ void incrementState() {
 
 // 0 = nothing, 1 = edge, 2 = divider
 int checkForBarrierRT() {
+  int echo = sonarRT.ping_median(2);
   int barrier = 0;
-  // TODO
 
   if (currDisplayMode == D_GUI) {
     Serial.print("E");
     Serial.println(barrier);
   }
+
+  if (echo < 200) {
+    edgeDetected = true;
+    return 0;
+  } else if (edgeDetected) {
+    edgeDetected = false;
+    if (echo == 0) {
+      return 1;
+    } else {
+      return 2;
+    }
+  } else {
+    edgeDetected = false;
+    return 0;
+  }
   return 0;
 }
 
 int checkForBarrierLT() {
+  int echo = sonarLT.ping_median(2);
   int barrier = 0;
-  // TODO
 
   if (currDisplayMode == D_GUI) {
     Serial.print("W");
     Serial.println(barrier);
   }
+
+  if (echo < 200) {
+    edgeDetected = true;
+    return 0;
+  } else if (edgeDetected) {
+    edgeDetected = false;
+    if (echo == 0) {
+      return 1;
+    } else {
+      return 2;
+    }
+  } else {
+    edgeDetected = false;
+    return 0;
+  }
   return 0;
 }
 
 int checkForBarrierUP() {
+  int echo = sonarUP.ping_median(2);
   int barrier = 0;
   // TODO
 
@@ -399,16 +473,49 @@ int checkForBarrierUP() {
     Serial.print("N");
     Serial.println(barrier);
   }
+
+  if (echo < 200) {
+    edgeDetected = true;
+    return 0;
+  } else if (edgeDetected) {
+    edgeDetected = false;
+    if (echo == 0) {
+      return 1;
+    } else {
+      return 2;
+    }
+  } else {
+    edgeDetected = false;
+    return 0;
+  }
+  return 0;
+
   return 0;
 }
 
 int checkForBarrierDN() {
+  int echo = sonarDN.ping_median(2);
   int barrier = 0;
   // TODO
 
   if (currDisplayMode == D_GUI) {
     Serial.print("S");
     Serial.println(barrier);
+  }
+
+  if (echo < 200) {
+    edgeDetected = true;
+    return 0;
+  } else if (edgeDetected) {
+    edgeDetected = false;
+    if (echo == 0) {
+      return 1;
+    } else {
+      return 2;
+    }
+  } else {
+    edgeDetected = false;
+    return 0;
   }
   return 0;
 }
@@ -632,7 +739,7 @@ bool lowerCupsX() {
   return (left && right);
 }
 
-bool liftCupsX() {
+bool liftCupsX(bool high) {
   bool left, right;
 
   long echoLT = sonarLT.ping_median(2);
@@ -650,40 +757,20 @@ bool liftCupsX() {
     Serial.print("w");
     Serial.println(echoLT);
   }
-
-  if (echoLT - echoRT > 20) {
-    analogWrite(L1, 255 / 4);
-    digitalWrite(L2, LOW);
-    analogWrite(R1, 255 / 4);
-    digitalWrite(R2, HIGH);
-    return false;
-  } else if (echoLT < 265) {
-    analogWrite(L1, 255 / 2);
-    digitalWrite(L2, LOW);
-    left = false;
+  analogWrite(L1, 255 / 4);
+  digitalWrite(L2, LOW);
+  analogWrite(R1, 255 / 4);
+  digitalWrite(R2, LOW);
+  if (high) {
+    delay(30);
   } else {
-    digitalWrite(L1, LOW);
-    digitalWrite(L2, LOW);
-    left = true;
+    delay(10);
   }
-
-  if (echoRT - echoLT > 20) {
-    analogWrite(L1, 255 / 4);
-    digitalWrite(L2, HIGH);
-    analogWrite(R1, 255 / 4);
-    digitalWrite(R2, LOW);
-    return false;
-  }
-  else if (echoRT < 265) {
-    analogWrite(R1, 255 / 2);
-    digitalWrite(R2, LOW);
-    right = false;
-  } else {
-    digitalWrite(R1, LOW);
-    digitalWrite(R2, LOW);
-    right = true;
-  }
-  return (left && right);
+  digitalWrite(L1, LOW);
+  digitalWrite(L2, LOW);
+  digitalWrite(R1, LOW);
+  digitalWrite(R2, LOW);
+  return true;
 }
 
 bool lowerCupsY() {
@@ -739,7 +826,7 @@ bool lowerCupsY() {
   return (up && down);
 }
 
-bool liftCupsY() {
+bool liftCupsY(bool high) {
   bool up, down;
 
   long echoUP = sonarUP.ping_median(2);
@@ -757,27 +844,20 @@ bool liftCupsY() {
     Serial.print("s");
     Serial.println(echoDN);
   }
-
-  if (echoUP < 270) {
-    analogWrite(U1, 255 / 2);
-    digitalWrite(U2, LOW);
-    up = false;
+  analogWrite(U1, 255 / 4);
+  digitalWrite(U2, LOW);
+  analogWrite(D1, 255 / 4);
+  digitalWrite(D2, LOW);
+  if (high) {
+    delay(30);
   } else {
-    digitalWrite(U1, LOW);
-    digitalWrite(U2, LOW);
-    up = true;
+    delay(10);
   }
-
-  if (echoDN < 270) {
-    analogWrite(D1, 255 / 2);
-    digitalWrite(D2, LOW);
-    down = false;
-  } else {
-    digitalWrite(D1, LOW);
-    digitalWrite(D2, LOW);
-    down = true;
-  }
-  return (up && down);
+  digitalWrite(U1, LOW);
+  digitalWrite(U2, LOW);
+  digitalWrite(D1, LOW);
+  digitalWrite(D2, LOW);
+  return true;
 }
 
 
