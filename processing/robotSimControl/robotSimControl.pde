@@ -10,6 +10,8 @@ Graph vacuumX, vacuumY, positionX, positionY;
 Graph ultrasonicN, ultrasonicS, ultrasonicE, ultrasonicW;
 Graph currGraph;
 final int NUM_VALUES = 200;
+int xExtreme = -1;
+int yExtreme = -1;
 
 void setup() {
   size(1200, 700);
@@ -73,6 +75,12 @@ void serialInput() {
       case 'y':
         positionY.update(nVal);
         break;
+      case 'X':
+        xExtreme = nVal;
+        break;
+      case 'Y':
+        yExtreme = nVal;
+        break;
       case 'n':
         ultrasonicN.update(nVal);
         break;
@@ -84,6 +92,34 @@ void serialInput() {
         break;
       case 'w':
         ultrasonicW.update(nVal);
+        break;
+      case 'N':
+        if (nVal > 0) {
+          winBot.edgeN = true;
+        } else {
+          winBot.edgeN = false;
+        }
+        break;
+      case 'S':
+        if (nVal > 0) {
+          winBot.edgeS = true;
+        } else {
+          winBot.edgeS = false;
+        }
+        break;
+      case 'E':
+        if (nVal > 0) {
+          winBot.edgeE = true;
+        } else {
+          winBot.edgeE = false;
+        }
+        break;
+      case 'W':
+        if (nVal > 0) {
+          winBot.edgeW = true;
+        } else {
+          winBot.edgeW = false;
+        }
         break;
       default:
         break;
@@ -99,55 +135,35 @@ void serialOutput(String msg) {
 
 void keyPressed() {
   switch (key) {
-      case 'u':
-        currGraph = vacuumX;
-        break;
-      case 'v':
-        currGraph = vacuumY;
-        break;
-      case 'x':
-        currGraph = positionX;
-        break;
-      case 'y':
-        currGraph = positionY;
-        break;
-      case 'n':
-        currGraph = ultrasonicN;
-        break;
-      case 's':
-        currGraph = ultrasonicS;
-        break;
-      case 'e':
-        currGraph = ultrasonicE;
-        break;
-      case 'w':
-        currGraph = ultrasonicW;
-        break;
-      // testing
-      case 'a':
-        winBot.edgeN = !winBot.edgeN;
-        currGraph.update(50);
-        break;
-      case 'b':
-        winBot.edgeW = !winBot.edgeW;
-        currGraph.update(100);
-        break;
-      case 'c':
-        winBot.edgeE = !winBot.edgeE;
-        currGraph.update(200);
-        break;
-      case 'd':
-        winBot.edgeS = !winBot.edgeS;
-        break;
-      case 'f':
-        winBot.xFixed = !winBot.xFixed;
-        break;
-      case 'g':
-        winBot.yFixed = !winBot.yFixed;
-        break;
-      case 'h':
-        footBot.fixed = !footBot.fixed;
-        break;
+    case 'u':
+      currGraph = vacuumX;
+      break;
+    case 'v':
+      currGraph = vacuumY;
+      break;
+    case 'x':
+      currGraph = positionX;
+      break;
+    case 'y':
+      currGraph = positionY;
+      break;
+    case 'n':
+      currGraph = ultrasonicN;
+      break;
+    case 's':
+      currGraph = ultrasonicS;
+      break;
+    case 'e':
+      currGraph = ultrasonicE;
+      break;
+    case 'w':
+      currGraph = ultrasonicW;
+      break;
+    // testing
+    case 'a':
+      winBot.edgeN = !winBot.edgeN;
+      currGraph.update(50);
+      break;
     default:
       println("Unknown key");
       break;

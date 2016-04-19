@@ -64,8 +64,10 @@ const long loTarget = 245;
 const long hiTarget = 265;
 const float pressureThreshold = -7.0;
 
-const bool verticalOrientation = false;
-// true means that the X railing is parallel with the X axis
+const bool longCupsVertical = true;
+// records the orientation of the robot
+// true means that the X railing (sponge holders) is vertical
+// true when the divider is vertical
 
 /********** States ***********/
 // Performs actions and state transitions. State can override its manager
@@ -93,22 +95,23 @@ const int S_WAIT_VAC_Y = 12;
 volatile int *currManager;
 volatile int currIndex;
 // linear motion
-int M_TRANSLATE_LT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_LT, -1};
-int M_TRANSLATE_RT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, -1};
-int M_TRANSLATE_UP[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_UP, -1};
-int M_TRANSLATE_DN[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, -1};
-int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_LIFT_Y, S_MOVE_LT, -1};
+int M_TRANSLATE_LT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_LT, -1}; // loops back around
+int M_TRANSLATE_RT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, -2};
+int M_TRANSLATE_UP[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_UP, -3};
+int M_TRANSLATE_DN[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, -4};
+int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_LIFT_Y, S_MOVE_LT, -5};
 // turns, robot zigzags against divider
 // when moving down, if barrier transition to linear motion
-int M_TURN_X_LR[35]={S_MOVE_LT,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_CENTER_X,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_CENTER_Y, -1}; // M_TRANSLATE_RT};
-int M_TURN_X_RL[35]={S_MOVE_RT,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_CENTER_X,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_CENTER_Y, -1}; //,M_TRANSLATE_LT};
+int M_TURN_X_LR[35]={S_MOVE_LT,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_CENTER_X,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_CENTER_Y, -2}; // M_TRANSLATE_RT
+int M_TURN_X_RL[35]={S_MOVE_RT,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_CENTER_X,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_MOVE_DN,S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,S_MOVE_UP,S_LOWER_Y,S_WAIT_VAC_Y,S_LIFT_X,S_CENTER_Y, -1}; // M_TRANSLATE_LT
 // turns, robot zigzags with divider (not used)
-int M_TURN_Y_LR[35]={S_MOVE_DN,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_CENTER_Y,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_CENTER_X, -1}; //,M_TRANSLATE_UP};
-int M_TURN_Y_RL[35]={S_MOVE_UP,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_CENTER_Y,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_CENTER_X, -1}; //,M_TRANSLATE_DN};
+int M_TURN_Y_LR[35]={S_MOVE_DN,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_CENTER_Y,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_CENTER_X, -3}; // M_TRANSLATE_UP
+int M_TURN_Y_RL[35]={S_MOVE_UP,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_CENTER_Y,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_MOVE_RT,S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,S_MOVE_LT,S_LOWER_X,S_WAIT_VAC_X,S_LIFT_Y,S_CENTER_X, -4}; // M_TRANSLATE_DN
 
 // TODO: M_DIVIDER_DN, M_DIVIDER_LT 
 // (robot starts in upper right??)
-int M_STOP[2] = {S_STOP_ALL, -1};
+int M_STOP[2] = {S_STOP_ALL, -10};
+// do not change order, only append to the end
 int *MANAGERS[10] = {M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN, M_DEBUG_LT, M_TURN_X_LR, M_TURN_X_RL, M_TURN_Y_LR, M_TURN_Y_RL, M_STOP};
 
 /********** Display Modes ***********/
@@ -352,14 +355,62 @@ void loop() {
   delay(35);
 }
 
+/********** State Machine Helpers ***********/
+
 void incrementState() {
   currIndex++;
   currState = *(currManager + currIndex);
-  if (currState == -1) {
+  if (currState < 0) {
     currIndex = 0;
+    currManager = MANAGERS[(-1*currState) - 1];
     currState = *currManager;
   }
   stateCounter = 0;
+}
+
+// 0 = nothing, 1 = edge, 2 = divider
+int checkForBarrierRT() {
+  int barrier = 0;
+  // TODO
+
+  if (currDisplayMode == D_GUI) {
+    Serial.print("E");
+    Serial.println(barrier);
+  }
+  return 0;
+}
+
+int checkForBarrierLT() {
+  int barrier = 0;
+  // TODO
+
+  if (currDisplayMode == D_GUI) {
+    Serial.print("W");
+    Serial.println(barrier);
+  }
+  return 0;
+}
+
+int checkForBarrierUP() {
+  int barrier = 0;
+  // TODO
+
+  if (currDisplayMode == D_GUI) {
+    Serial.print("N");
+    Serial.println(barrier);
+  }
+  return 0;
+}
+
+int checkForBarrierDN() {
+  int barrier = 0;
+  // TODO
+
+  if (currDisplayMode == D_GUI) {
+    Serial.print("S");
+    Serial.println(barrier);
+  }
+  return 0;
 }
 
 /********** Actions ***********/
@@ -400,7 +451,9 @@ bool waitVacuumY() {
 
 bool moveLT() {
   if (currDisplayMode == D_GUI) {
-    // TODO: read encoder
+    xPosition = xEncoder.read();
+    Serial.print("x");
+    Serial.println(xPosition);
   }
 
   if (digitalRead(pinLimLT) == HIGH) {
@@ -416,7 +469,9 @@ bool moveLT() {
 
 bool moveRT() {
   if (currDisplayMode == D_GUI) {
-    // TODO: read encoder
+    xPosition = xEncoder.read();
+    Serial.print("x");
+    Serial.println(xPosition);
   }
 
   if (digitalRead(pinLimRT) == HIGH) {
@@ -432,7 +487,9 @@ bool moveRT() {
 
 bool moveUP() {
   if (currDisplayMode == D_GUI) {
-    // TODO: read encoder
+    yPosition = yEncoder.read();
+    Serial.print("y");
+    Serial.println(yPosition);
   }
 
   if (digitalRead(pinLimUP) == HIGH) {
@@ -448,7 +505,9 @@ bool moveUP() {
 
 bool moveDN() {
   if (currDisplayMode == D_GUI) {
-    // TODO: read encoder
+    yPosition = yEncoder.read();
+    Serial.print("y");
+    Serial.println(yPosition);
   }
 
   if (digitalRead(pinLimDN) == HIGH) {
@@ -482,6 +541,11 @@ bool moveMidX() {
   } else {
     digitalWrite(X1, LOW);
     digitalWrite(X2, LOW);
+
+    if (currDisplayMode == D_GUI) {
+      Serial.print("X");
+      Serial.println(xExtreme);
+    }
     return true;
   }
 }
@@ -506,6 +570,11 @@ bool moveMidY() {
   } else {
     digitalWrite(Y1, LOW);
     digitalWrite(Y2, LOW);
+
+    if (currDisplayMode == D_GUI) {
+      Serial.print("Y");
+      Serial.println(yExtreme);
+    }
     return true;
   }
 }
