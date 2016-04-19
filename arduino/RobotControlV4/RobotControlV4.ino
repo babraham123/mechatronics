@@ -202,6 +202,16 @@ void loop() {
   /********** Manual Control ***********/
   if (Serial.available() > 0) {
     switch (Serial.read()) {
+      case '1':
+        currState = S_MOVE_RT;
+        currManager = M_STOP;
+        break;
+
+      case '2':
+        currState = S_MOVE_LT;
+        currManager = M_STOP;
+        break;
+        
       case 'a':
         currIndex = -1;
         currManager = M_TRANSLATE_LT;
@@ -239,7 +249,7 @@ void loop() {
         break;
 
       case 'i':
-        currState = S_LIFT_X_LO;
+        currState = S_LIFT_X_HI;
         currManager = M_STOP;
         break;
 
@@ -288,6 +298,7 @@ void loop() {
 
       default:
         currIndex = -1;
+        currState = S_STOP_ALL;
         currManager = M_STOP;
         incrementState();
         break;
@@ -365,7 +376,7 @@ void loop() {
 
     case S_LIFT_Y_HI:
       digitalWrite(yValve, HIGH);
-      if (liftCupsY(false)) {
+      if (liftCupsY(true)) {
         digitalWrite(yValve, LOW);
         incrementState();
       }
@@ -705,13 +716,13 @@ bool lowerCupsX() {
     Serial.println(echoLT);
   }
 
-  if ((echoLT < 250) && (echoRT > 255)) {
-    analogWrite(L1, 255 / 16);
+  if ((echoLT < 255) && (echoRT > 265)) {
+    analogWrite(L1, 255 / 8);
     digitalWrite(L2, HIGH);
-    analogWrite(R1, 255 / 4);
+    analogWrite(R1, 255 / 8);
     digitalWrite(R2, LOW);
     return false;
-  } else if (echoLT > 265) {
+  } else if (echoLT > 260) {
     analogWrite(L1, 255 / 16);
     digitalWrite(L2, HIGH);
     left = false;
@@ -721,13 +732,13 @@ bool lowerCupsX() {
     left = true;
   }
 
-  if ((echoRT < 250) && (echoLT > 255)) {
-    analogWrite(L1, 255 / 4);
+  if ((echoRT < 255) && (echoLT > 265)) {
+    analogWrite(L1, 255 / 8);
     digitalWrite(L2, LOW);
-    analogWrite(R1, 255 / 16);
+    analogWrite(R1, 255 / 8);
     digitalWrite(R2, HIGH);
     return false;
-  } else if (echoRT > 265) {
+  } else if (echoRT > 260) {
     analogWrite(R1, 255 / 16);
     digitalWrite(R2, HIGH);
     right = false;
@@ -757,14 +768,14 @@ bool liftCupsX(bool high) {
     Serial.print("w");
     Serial.println(echoLT);
   }
-  analogWrite(L1, 255 / 4);
+  digitalWrite(L1, HIGH);
   digitalWrite(L2, LOW);
-  analogWrite(R1, 255 / 4);
+  digitalWrite(R1, HIGH);
   digitalWrite(R2, LOW);
   if (high) {
-    delay(30);
+    delay(1000);
   } else {
-    delay(10);
+    delay(250);
   }
   digitalWrite(L1, LOW);
   digitalWrite(L2, LOW);
@@ -792,13 +803,13 @@ bool lowerCupsY() {
     Serial.println(echoDN);
   }
 
-  if ((echoUP < 230) && (echoDN > 230)) {
-    analogWrite(U1, 255 / 16);
+  if ((echoUP < 240) && (echoDN > 250)) {
+    analogWrite(U1, 255 / 8);
     digitalWrite(U2, HIGH);
-    analogWrite(D1, 255 / 4);
+    analogWrite(D1, 255 / 8);
     digitalWrite(D2, LOW);
     return false;
-  } else if (echoUP > 250) {
+  } else if (echoUP > 245) {
     analogWrite(U1, 255 / 16);
     digitalWrite(U2, HIGH);
     up = false;
@@ -808,13 +819,13 @@ bool lowerCupsY() {
     up = true;
   }
 
-  if ((echoDN < 230) && (echoUP > 230)) {
-    analogWrite(U1, 255 / 4);
+  if ((echoDN < 240) && (echoUP > 250)) {
+    analogWrite(U1, 255 / 8);
     digitalWrite(U2, LOW);
-    analogWrite(D1, 255 / 16);
+    analogWrite(D1, 255 / 8);
     digitalWrite(D2, HIGH);
     return false;
-  } else if (echoDN > 250) {
+  } else if (echoDN > 245) {
     analogWrite(D1, 255 / 16);
     digitalWrite(D2, HIGH);
     down = false;
@@ -844,14 +855,14 @@ bool liftCupsY(bool high) {
     Serial.print("s");
     Serial.println(echoDN);
   }
-  analogWrite(U1, 255 / 4);
+  digitalWrite(U1, HIGH);
   digitalWrite(U2, LOW);
-  analogWrite(D1, 255 / 4);
+  digitalWrite(D1, HIGH);
   digitalWrite(D2, LOW);
   if (high) {
-    delay(30);
+    delay(1000);
   } else {
-    delay(10);
+    delay(400);
   }
   digitalWrite(U1, LOW);
   digitalWrite(U2, LOW);
@@ -924,10 +935,10 @@ void displayPressure() {
 }
 
 void displayUltrasonic() {
-  long echoLT = sonarLT.ping_median(5);
-  long echoRT = sonarRT.ping_median(5);
-  long echoUP = sonarUP.ping_median(5);
-  long echoDN = sonarDN.ping_median(5);
+  long echoLT = sonarLT.ping_median(2);
+  long echoRT = sonarRT.ping_median(2);
+  long echoUP = sonarUP.ping_median(2);
+  long echoDN = sonarDN.ping_median(2);
   Serial.print("LT=");
   Serial.print(echoLT);
   Serial.print(" RT=");
