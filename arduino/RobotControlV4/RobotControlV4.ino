@@ -737,14 +737,14 @@ bool moveDN() {
 
 /* Assumes total distance of 10cm */
 bool SonarMidX() {
-  int target = 5;
+  int target = 300;
   int echo = sonarEAST.ping_median(2);
   int distance = sonarEAST.convert_cm(echo);
-  if (echo - target > 0) {
+  if (echo - target > 25) {
     digitalWrite(X1, LOW);
     digitalWrite(X2, HIGH);
     return false;
-  } else if (echo - target < 0) {
+  } else if (echo - target < -25) {
     digitalWrite(X1, HIGH);
     digitalWrite(X2, LOW);
     return false;
@@ -757,14 +757,14 @@ bool SonarMidX() {
 }
 
 bool SonarMidY() {
-  int target = 5;
+  int target = 300;
   int echo = sonarNORTH.ping_median(2);
   int distance = sonarNORTH.convert_cm(echo);
-  if (echo - target > 0) {
+  if (echo - target > 25) {
     digitalWrite(Y1, LOW);
     digitalWrite(Y2, HIGH);
     return false;
-  } else if (echo - target < 0) {
+  } else if (echo - target < -25) {
     digitalWrite(Y1, HIGH);
     digitalWrite(Y2, LOW);
     return false;
