@@ -44,6 +44,11 @@ const int echoUP = 29;
 const int trigDN = 26;
 const int echoDN = 27;
 
+const int trigWEST = 30;
+const int echoWEST = 31;
+const int trigNORTH = 32;
+const int echoNORTH = 33;
+
 const int yValve = 40;
 const int xValve = 41;
 
@@ -54,6 +59,8 @@ NewPing sonarLT(trigLT, echoLT, 8);
 NewPing sonarRT(trigRT, echoRT, 8);
 NewPing sonarUP(trigUP, echoUP, 8);
 NewPing sonarDN(trigDN, echoDN, 8);
+NewPing sonarWEST(trigWEST, echoWEST, 10);
+NewPing sonarNORTH(trigNORTH, echoNORTH, 10);
 
 Encoder yEncoder(2, 4);
 Encoder xEncoder(3, 5);
@@ -156,7 +163,8 @@ const int D_DEBUG = 2;
 /* Global Variables */
 volatile bool limitLT, limitRT, limitUP, limitDN;
 volatile int yExtreme, yPosition, xExtreme, xPosition;
-volatile bool edgeDetected;
+long xSonarMid, ySonarMid;
+volatile bool edgeDetected, noTurns;
 
 void setup() {
   Serial.begin(9600);
@@ -166,6 +174,7 @@ void setup() {
   stateCounter = 0;
   currManager = M_STOP;
   edgeDetected = false;
+  noTurns = true;
 
   pinMode(pinLimLT, INPUT);
   pinMode(pinLimRT, INPUT);
@@ -338,39 +347,82 @@ void loop() {
   }
 
   /********** States and Transitions ***********/
+  int barrierDetect = 0;
   switch (currState) {
     case S_MOVE_LT:
-      if (moveLT()) {
+      barrierDetect = checkForBarrierRT();
+      if (barrierDetect == 1) {
+        currIndex = -1;
+        currManager = M_TURN_X_RL;
         incrementState();
+      } else if (barrierDetect == 2) {
+        currIndex = -1;
+        currManager = M_DIVIDER_LT;
+        incrementState();
+      } else {
+        if (moveLT()) {
+          incrementState();
+        }
       }
       break;
 
     case S_MOVE_RT:
-      if (moveRT()) {
+      barrierDetect = checkForBarrierLT();
+      if (barrierDetect == 1) {
+        currIndex = -1;
+        currManager = M_TURN_X_LR;
         incrementState();
+      } else if (barrierDetect == 2) {
+        currIndex = -1;
+        currManager = M_DIVIDER_LT;
+        incrementState();
+      } else {
+        if (moveRT()) {
+          incrementState();
+        }
       }
       break;
 
     case S_MOVE_UP:
-      if (moveUP()) {
+      barrierDetect = checkForBarrierDN();
+      if (barrierDetect == 1) {
+        currIndex = -1;
+        currManager = M_STOP;
         incrementState();
+      } else {
+        if (moveUP()) {
+          incrementState();
+        }
       }
       break;
 
     case S_MOVE_DN:
-      if (moveDN()) {
+      barrierDetect = checkForBarrierUP();
+      if (barrierDetect == 1) {
+        currIndex = -1;
+        currManager = M_STOP;
         incrementState();
+      } else {
+        if (moveDN()) {
+          incrementState();
+        }
       }
       break;
 
     case S_CENTER_X:
       if (moveMidX()) {
+        if (currManager == M_CALIBRATE) {
+          xSonarMid = sonarWEST.ping_median(2);
+        }
         incrementState();
       }
       break;
 
     case S_CENTER_Y:
       if (moveMidY()) {
+        if (currManager == M_CALIBRATE) {
+          ySonarMid = sonarNORTH.ping_median(2);
+        }
         incrementState();
       }
       break;
@@ -459,7 +511,7 @@ int checkForBarrierRT() {
   int echo = sonarRT.ping_median(2);
   int barrier = 0;
 
-  if (echo < 200) {
+  if (echo < 170) {
     edgeDetected = true;
     barrier = 0;
   } else if (edgeDetected) {
@@ -478,6 +530,10 @@ int checkForBarrierRT() {
     Serial.print("E");
     Serial.println(barrier);
   }
+  if (noTurns) {
+    barrier = 0;
+  }
+
   return barrier;
 }
 
@@ -485,7 +541,7 @@ int checkForBarrierLT() {
   int echo = sonarLT.ping_median(2);
   int barrier = 0;
 
-  if (echo < 200) {
+  if (echo < 170) {
     edgeDetected = true;
     barrier = 0;
   } else if (edgeDetected) {
@@ -504,6 +560,11 @@ int checkForBarrierLT() {
     Serial.print("W");
     Serial.println(barrier);
   }
+
+  if (noTurns) {
+    barrier = 0;
+  }
+
   return barrier;
 }
 
@@ -511,7 +572,7 @@ int checkForBarrierUP() {
   int echo = sonarUP.ping_median(2);
   int barrier = 0;
 
-  if (echo < 200) {
+  if (echo < 170) {
     edgeDetected = true;
     barrier = 0;
   } else if (edgeDetected) {
@@ -530,6 +591,11 @@ int checkForBarrierUP() {
     Serial.print("N");
     Serial.println(barrier);
   }
+
+  if (noTurns) {
+    barrier = 0;
+  }
+
   return barrier;
 }
 
@@ -537,7 +603,7 @@ int checkForBarrierDN() {
   int echo = sonarDN.ping_median(2);
   int barrier = 0;
 
-  if (echo < 200) {
+  if (echo < 170) {
     edgeDetected = true;
     barrier = 0;
   } else if (edgeDetected) {
@@ -556,6 +622,11 @@ int checkForBarrierDN() {
     Serial.print("S");
     Serial.println(barrier);
   }
+
+  if (noTurns) {
+    barrier = 0;
+  }
+
   return barrier;
 }
 
@@ -665,6 +736,47 @@ bool moveDN() {
     digitalWrite(Y2, LOW);
     return true;
   }
+}
+
+/* Assumes total distance of 10cm */
+bool SonarMidX() {
+  int target = 300;
+  int echo = sonarWEST.ping_median(2);
+  int distance = sonarWEST.convert_cm(echo);
+  if (echo - target > 25) {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, HIGH);
+    return false;
+  } else if (echo - target < -25) {
+    digitalWrite(X1, HIGH);
+    digitalWrite(X2, LOW);
+    return false;
+  } else {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, LOW);
+    return true;
+  }
+  return false;
+}
+
+bool SonarMidY() {
+  int target = 300;
+  int echo = sonarNORTH.ping_median(2);
+  int distance = sonarNORTH.convert_cm(echo);
+  if (echo - target > 25) {
+    digitalWrite(Y1, LOW);
+    digitalWrite(Y2, HIGH);
+    return false;
+  } else if (echo - target < -25) {
+    digitalWrite(Y1, HIGH);
+    digitalWrite(Y2, LOW);
+    return false;
+  } else {
+    digitalWrite(Y1, LOW);
+    digitalWrite(Y2, LOW);
+    return true;
+  }
+  return false;
 }
 
 bool moveMidX() {
@@ -967,6 +1079,8 @@ void displayUltrasonic() {
   long echoRT = sonarRT.ping_median(2);
   long echoUP = sonarUP.ping_median(2);
   long echoDN = sonarDN.ping_median(2);
+  long echoN = sonarNORTH.ping_median(2);
+  long echoW = sonarWEST.ping_median(2);
   Serial.print("LT=");
   Serial.print(echoLT);
   Serial.print(" RT=");
@@ -974,6 +1088,10 @@ void displayUltrasonic() {
   Serial.print(" UP=");
   Serial.print(echoUP);
   Serial.print(" DN=");
-  Serial.println(echoDN);
+  Serial.print(echoDN);
+  Serial.print(" N=");
+  Serial.print(echoN);
+  Serial.print(" W=");
+  Serial.println(echoW);
   return;
 }

@@ -3,6 +3,7 @@
 // Bereket Abraham
 
 import processing.serial.*;
+
 Serial myPort;
 Robot winBot;
 Foot footBot;
@@ -10,8 +11,8 @@ Graph vacuumX, vacuumY, positionX, positionY;
 Graph ultrasonicN, ultrasonicS, ultrasonicE, ultrasonicW;
 Graph currGraph;
 final int NUM_VALUES = 200;
-int xExtreme = -1;
-int yExtreme = -1;
+int xExtreme = Integer.MAX_VALUE;
+int yExtreme = Integer.MAX_VALUE;
 
 void setup() {
   size(1200, 700);
