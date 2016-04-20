@@ -831,13 +831,13 @@ bool lowerCupsY() {
     Serial.println(echoDN);
   }
 
-  if ((echoUP < 240) && (echoDN > 250)) {
+  if ((echoUP < 235) && (echoDN > 245)) {
     analogWrite(U1, 255 / 8);
     digitalWrite(U2, HIGH);
     analogWrite(D1, 255 / 8);
     digitalWrite(D2, LOW);
     return false;
-  } else if (echoUP > 245) {
+  } else if (echoUP > 240) {
     analogWrite(U1, 255 / 16);
     digitalWrite(U2, HIGH);
     up = false;
@@ -847,13 +847,13 @@ bool lowerCupsY() {
     up = true;
   }
 
-  if ((echoDN < 240) && (echoUP > 250)) {
+  if ((echoDN < 235) && (echoUP > 245)) {
     analogWrite(U1, 255 / 8);
     digitalWrite(U2, LOW);
     analogWrite(D1, 255 / 8);
     digitalWrite(D2, HIGH);
     return false;
-  } else if (echoDN > 245) {
+  } else if (echoDN > 240) {
     analogWrite(D1, 255 / 16);
     digitalWrite(D2, HIGH);
     down = false;
