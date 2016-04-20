@@ -157,7 +157,8 @@ int M_CALIBRATE[7] = {S_MOVE_DN, S_MOVE_UP, S_CENTER_Y, S_MOVE_RT, S_MOVE_LT, S_
 int M_STOP[2] = {S_STOP_ALL, -10};
 // do not change order, only append to the end
 int *MANAGERS[12] = {M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN, M_DEBUG_LT, 
-                     M_TURN_X_LR, M_TURN_X_RL, M_TURN_Y_LR, M_TURN_Y_RL, M_STOP, M_DIVIDER_LT, M_DIVIDER_DN};
+                     M_TURN_X_LR, M_TURN_X_RL, M_TURN_Y_LR, M_TURN_Y_RL, M_STOP, M_DIVIDER_LT, M_DIVIDER_DN
+                    };
 
 /********** Display Modes ***********/
 // Determines what is outputted to the Serial port by the actions
@@ -170,7 +171,7 @@ const int D_DEBUG = 2;
 volatile bool limitLT, limitRT, limitUP, limitDN;
 volatile int yExtreme, yPosition, xExtreme, xPosition;
 long xSonarMid, ySonarMid;
-volatile bool edgeDetected, noTurns;
+volatile bool edgeDetected, noTurns, xRaised, yRaised;;
 
 void setup() {
   Serial.begin(9600);
@@ -357,7 +358,12 @@ void loop() {
   int barrierDetect = 0;
   switch (currState) {
     case S_MOVE_LT:
-      barrierDetect = checkForBarrierRT();
+      if (xRaised) {
+        barrierDetect = checkForBarrierRT();
+      } else {
+        barrierDetect = 0;
+      }
+
       if (barrierDetect == 1) {
         currIndex = -1;
         currManager = M_TURN_X_RL;
@@ -374,7 +380,12 @@ void loop() {
       break;
 
     case S_MOVE_RT:
-      barrierDetect = checkForBarrierLT();
+      if (xRaised) {
+        barrierDetect = checkForBarrierLT();
+      } else {
+        barrierDetect = 0;
+      }
+
       if (barrierDetect == 1) {
         currIndex = -1;
         currManager = M_TURN_X_LR;
@@ -391,7 +402,12 @@ void loop() {
       break;
 
     case S_MOVE_UP:
-      barrierDetect = checkForBarrierDN();
+      if (yRaised) {
+        barrierDetect = checkForBarrierDN();
+      } else {
+        barrierDetect = 0;
+      }
+
       if (barrierDetect == 1) {
         currIndex = -1;
         currManager = M_STOP;
@@ -404,7 +420,12 @@ void loop() {
       break;
 
     case S_MOVE_DN:
-      barrierDetect = checkForBarrierUP();
+      if (yRaised) {
+        barrierDetect = checkForBarrierUP();
+      } else {
+        barrierDetect = 0;
+      }
+
       if (barrierDetect == 1) {
         currIndex = -1;
         currManager = M_STOP;
@@ -417,7 +438,12 @@ void loop() {
       break;
 
     case S_CENTER_X:
-      if (moveMidX()) {
+      if (sonarWEST.ping() != 0) {
+        if (SonarMidX()) {
+          incrementState();
+        }
+        break;
+      } else if (moveMidX()) {
         if (currManager == M_CALIBRATE) {
           xSonarMid = sonarWEST.ping_median(2);
         }
@@ -426,7 +452,12 @@ void loop() {
       break;
 
     case S_CENTER_Y:
-      if (moveMidY()) {
+      if (sonarNORTH.ping() != 0) {
+        if (SonarMidY()) {
+          incrementState();
+        }
+        break;
+      } else if (moveMidY()) {
         if (currManager == M_CALIBRATE) {
           ySonarMid = sonarNORTH.ping_median(2);
         }
@@ -435,43 +466,43 @@ void loop() {
       break;
 
     case S_LIFT_X_LO:
-      digitalWrite(xPump, LOW);
       if (liftCupsX(false)) {
+        xRaised = true;
         incrementState();
       }
       break;
 
     case S_LIFT_X_HI:
-      digitalWrite(xPump, LOW);
       if (liftCupsX(true)) {
+        xRaised = true;
         incrementState();
       }
       break;
 
     case S_LOWER_X:
-      digitalWrite(xPump, HIGH);
       if (lowerCupsX()) {
+        xRaised = false;
         incrementState();
       }
       break;
 
     case S_LIFT_Y_LO:
-      digitalWrite(yPump, LOW);
       if (liftCupsY(false)) {
+        yRaised = true;
         incrementState();
       }
       break;
 
     case S_LIFT_Y_HI:
-      digitalWrite(yPump, LOW);
       if (liftCupsY(true)) {
+        yRaised = true;
         incrementState();
       }
       break;
 
     case S_LOWER_Y:
-      digitalWrite(yPump, HIGH);
       if (lowerCupsY()) {
+        yRaised = false;
         incrementState();
       }
       break;
@@ -511,10 +542,10 @@ void incrementState() {
 
 // 0 = nothing, 1 = edge, 2 = divider
 int checkForBarrierRT() {
-  int echo = sonarRT.ping_median(2);
+  int echo = sonarRT.ping_median(5);
   int barrier = 0;
 
-  if (echo < 170) {
+  if (echo < 240) {
     edgeDetected = true;
     barrier = 0;
   } else if (edgeDetected) {
@@ -541,10 +572,10 @@ int checkForBarrierRT() {
 }
 
 int checkForBarrierLT() {
-  int echo = sonarLT.ping_median(2);
+  int echo = sonarLT.ping_median(5);
   int barrier = 0;
 
-  if (echo < 170) {
+  if (echo < 240) {
     edgeDetected = true;
     barrier = 0;
   } else if (edgeDetected) {
@@ -572,10 +603,10 @@ int checkForBarrierLT() {
 }
 
 int checkForBarrierUP() {
-  int echo = sonarUP.ping_median(2);
+  int echo = sonarUP.ping_median(5);
   int barrier = 0;
 
-  if (echo < 170) {
+  if (echo < 240) {
     edgeDetected = true;
     barrier = 0;
   } else if (edgeDetected) {
@@ -603,10 +634,10 @@ int checkForBarrierUP() {
 }
 
 int checkForBarrierDN() {
-  int echo = sonarDN.ping_median(2);
+  int echo = sonarDN.ping_median(5);
   int barrier = 0;
 
-  if (echo < 170) {
+  if (echo < 240) {
     edgeDetected = true;
     barrier = 0;
   } else if (edgeDetected) {
@@ -743,14 +774,14 @@ bool moveDN() {
 
 /* Assumes total distance of 10cm */
 bool SonarMidX() {
-  int target = 300;
+  int target = 450;
   int echo = sonarWEST.ping_median(2);
   int distance = sonarWEST.convert_cm(echo);
-  if (echo - target > 25) {
+  if (echo - target > 20) {
     digitalWrite(X1, LOW);
     digitalWrite(X2, HIGH);
     return false;
-  } else if (echo - target < -25) {
+  } else if (echo - target < -20) {
     digitalWrite(X1, HIGH);
     digitalWrite(X2, LOW);
     return false;
@@ -763,14 +794,14 @@ bool SonarMidX() {
 }
 
 bool SonarMidY() {
-  int target = 300;
+  int target = 450;
   int echo = sonarNORTH.ping_median(2);
   int distance = sonarNORTH.convert_cm(echo);
-  if (echo - target > 25) {
+  if (echo - target > 20) {
     digitalWrite(Y1, LOW);
     digitalWrite(Y2, HIGH);
     return false;
-  } else if (echo - target < -25) {
+  } else if (echo - target < -20) {
     digitalWrite(Y1, HIGH);
     digitalWrite(Y2, LOW);
     return false;
