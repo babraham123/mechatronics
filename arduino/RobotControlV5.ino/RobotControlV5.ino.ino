@@ -5,10 +5,16 @@
 
 /* Manual Control Scheme
 
-   Movement: WASD, y centers Y
+   Movement: WASD, x/y centers X/Y
    X legs: i to raise, k to lower
    Y legs: o to raise, l to lower
    Pressure: p to display pressure
+*/
+
+/*
+ultrasonic readings: 
+NW center 450, 450 +- 20
+<240 edge
 */
 
 #include <Encoder.h>
