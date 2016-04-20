@@ -44,6 +44,11 @@ const int echoUP = 29;
 const int trigDN = 26;
 const int echoDN = 27;
 
+const int trigEAST = 30;
+const int echoEAST = 31;
+const int trigNORTH = 32;
+const int echoNORTH = 33;
+
 const int yValve = 40;
 const int xValve = 41;
 
@@ -54,6 +59,9 @@ NewPing sonarLT(trigLT, echoLT, 8);
 NewPing sonarRT(trigRT, echoRT, 8);
 NewPing sonarUP(trigUP, echoUP, 8);
 NewPing sonarDN(trigDN, echoDN, 8);
+
+NewPing sonarEAST(trigEAST, echoEAST, 10);    // Pointed towards West end
+NewPing sonarNORTH(trigNORTH, echoNORTH, 10); // Pointed towards North end
 
 Encoder yEncoder(2, 4);
 Encoder xEncoder(3, 5);
@@ -93,10 +101,10 @@ const int S_WAIT_VAC_Y = 14;
 volatile int *currManager;
 volatile int currIndex;
 // linear motion
-int M_TRANSLATE_LT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_LT, -1}; // loops back around
-int M_TRANSLATE_RT[9] = {S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT, -2};
-int M_TRANSLATE_UP[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_UP, -3};
-int M_TRANSLATE_DN[9] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN, -4};
+int M_TRANSLATE_LT[10] = {S_CENTER_Y, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_LT, -1}; // loops back around
+int M_TRANSLATE_RT[10] = {S_CENTER_Y, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT, -2};
+int M_TRANSLATE_UP[10] = {S_CENTER_X, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_UP, -3};
+int M_TRANSLATE_DN[10] = {S_CENTER_X, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN, -4};
 int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X_LO, S_MOVE_RT, S_LOWER_X, S_LIFT_Y_LO, S_MOVE_LT, -5};
 
 // turns, robot zigzags against divider
@@ -126,22 +134,26 @@ int M_TURN_Y_RL[35] = {S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_CENTER
                        S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_CENTER_X, -4
                       }; // M_TRANSLATE_DN
 
-// TODO: M_DIVIDER_DN, M_DIVIDER_RT
+// TODO: Ishit talk to Roy
+int M_DIVIDER_LT[25] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_LT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_MOVE_RT,
+                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_CENTER_X, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_MOVE_RT,
+                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_LT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_CENTER_X, -1
+                       };
+// divider, robot zigzags with divider (not used)
 int M_DIVIDER_DN[21] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_CENTER_Y,
                         S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_MOVE_DN,
-                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_CENTER_Y, -1
+                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_CENTER_Y, -4
                        };
 
-int M_DIVIDER_RT[25] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_MOVE_LT,
-                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_CENTER_X, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_MOVE_LT,
-                        S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_HI, S_CENTER_X, -2
-                       };
-
+int M_CALIBRATE[7] = {S_MOVE_DN, S_MOVE_UP, S_CENTER_Y, S_MOVE_RT, S_MOVE_LT, S_CENTER_X, -10};
+//int M_CALIBRATE[4] = {S_MOVE_DN, S_MOVE_UP, S_CENTER_Y, -10};
 
 // (robot starts in upper right??)
 int M_STOP[2] = {S_STOP_ALL, -10};
 // do not change order, only append to the end
-int *MANAGERS[10] = {M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN, M_DEBUG_LT, M_TURN_X_LR, M_TURN_X_RL, M_TURN_Y_LR, M_TURN_Y_RL, M_STOP};
+int *MANAGERS[12] = {M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN, M_DEBUG_LT,
+                     M_TURN_X_LR, M_TURN_X_RL, M_TURN_Y_LR, M_TURN_Y_RL, M_STOP, M_DIVIDER_LT, M_DIVIDER_DN
+                    };
 
 /********** Display Modes ***********/
 // Determines what is outputted to the Serial port by the actions
@@ -153,7 +165,7 @@ const int D_DEBUG = 2;
 /* Global Variables */
 volatile bool limitLT, limitRT, limitUP, limitDN;
 volatile int yExtreme, yPosition, xExtreme, xPosition;
-volatile bool edgeDetected;
+volatile bool edgeDetected, noTurns;
 
 void setup() {
   Serial.begin(9600);
@@ -163,6 +175,7 @@ void setup() {
   stateCounter = 0;
   currManager = M_STOP;
   edgeDetected = false;
+  noTurns = true;
 
   pinMode(pinLimLT, INPUT);
   pinMode(pinLimRT, INPUT);
@@ -202,16 +215,6 @@ void loop() {
   /********** Manual Control ***********/
   if (Serial.available() > 0) {
     switch (Serial.read()) {
-      case '1':
-        currState = S_MOVE_RT;
-        currManager = M_STOP;
-        break;
-
-      case '2':
-        currState = S_MOVE_LT;
-        currManager = M_STOP;
-        break;
-        
       case 'a':
         currIndex = -1;
         currManager = M_TRANSLATE_LT;
@@ -246,6 +249,26 @@ void loop() {
         currIndex = -1;
         currManager = M_TURN_X_RL;
         incrementState();
+        break;
+
+      case '1':
+        currState = S_MOVE_LT;
+        currManager = M_STOP;
+        break;
+
+      case '2':
+        currState = S_MOVE_RT;
+        currManager = M_STOP;
+        break;
+
+      case '3':
+        currState = S_MOVE_UP;
+        currManager = M_STOP;
+        break;
+
+      case '4':
+        currState = S_MOVE_DN;
+        currManager = M_STOP;
         break;
 
       case 'i':
@@ -296,6 +319,25 @@ void loop() {
         incrementState();
         break;
 
+      case 'c':
+        currIndex = -1;
+        currManager = M_CALIBRATE;
+        incrementState();
+        break;
+      // debug
+      case '7':
+        digitalWrite(xValve, HIGH);
+        break;
+      case '8':
+        digitalWrite(yValve, HIGH);
+        break;
+      case '9':
+        digitalWrite(xValve, LOW);
+        break;
+      case '0':
+        digitalWrite(yValve, LOW);
+        break;
+
       default:
         currIndex = -1;
         currState = S_STOP_ALL;
@@ -305,29 +347,67 @@ void loop() {
     }
   }
 
+  int barrierDetect;
+
   /********** States and Transitions ***********/
   switch (currState) {
     case S_MOVE_LT:
-      if (moveLT()) {
+      barrierDetect = checkForBarrierRT();
+      if (barrierDetect == 1) {
+        currIndex = -1;
+        currManager = M_TURN_X_RL;
         incrementState();
+      } else if (barrierDetect == 2) {
+        currIndex = -1;
+        currManager = M_DIVIDER_LT;
+        incrementState();
+      } else {
+        if (moveLT()) {
+          incrementState();
+        }
       }
       break;
 
     case S_MOVE_RT:
-      if (moveRT()) {
+      barrierDetect = checkForBarrierLT();
+      if (barrierDetect == 1) {
+        currIndex = -1;
+        currManager = M_TURN_X_LR;
         incrementState();
+      } else if (barrierDetect == 2) {
+        currIndex = -1;
+        currManager = M_DIVIDER_LT;
+        incrementState();
+      } else {
+        if (moveRT()) {
+          incrementState();
+        }
       }
       break;
 
     case S_MOVE_UP:
-      if (moveUP()) {
+      barrierDetect = checkForBarrierDN();
+      if (barrierDetect == 1) {
+        currIndex = -1;
+        currManager = M_STOP;
         incrementState();
+      } else {
+        if (moveUP()) {
+          incrementState();
+        }
       }
       break;
 
     case S_MOVE_DN:
-      if (moveDN()) {
+      barrierDetect = checkForBarrierUP();
+      if (barrierDetect == 1) {
+        currIndex = -1;
+        currManager = M_STOP;
         incrementState();
+      } else {
+        if (moveDN()) {
+          incrementState();
+        }
       }
       break;
 
@@ -427,108 +507,124 @@ int checkForBarrierRT() {
   int echo = sonarRT.ping_median(2);
   int barrier = 0;
 
+  if (echo < 170) {
+    edgeDetected = true;
+    barrier = 0;
+  } else if (edgeDetected) {
+    edgeDetected = false;
+    if (echo == 0) {
+      barrier = 1;
+    } else {
+      barrier = 2;
+    }
+  } else {
+    edgeDetected = false;
+    barrier = 0;
+  }
+
   if (currDisplayMode == D_GUI) {
     Serial.print("E");
     Serial.println(barrier);
   }
 
-  if (echo < 200) {
-    edgeDetected = true;
-    return 0;
-  } else if (edgeDetected) {
-    edgeDetected = false;
-    if (echo == 0) {
-      return 1;
-    } else {
-      return 2;
-    }
-  } else {
-    edgeDetected = false;
-    return 0;
+  if (noTurns) {
+    barrier = 0;
   }
-  return 0;
+
+  return barrier;
 }
 
 int checkForBarrierLT() {
   int echo = sonarLT.ping_median(2);
   int barrier = 0;
 
+  if (echo < 170) {
+    edgeDetected = true;
+    barrier = 0;
+  } else if (edgeDetected) {
+    edgeDetected = false;
+    if (echo == 0) {
+      barrier = 1;
+    } else {
+      barrier = 2;
+    }
+  } else {
+    edgeDetected = false;
+    barrier = 0;
+  }
+
   if (currDisplayMode == D_GUI) {
     Serial.print("W");
     Serial.println(barrier);
   }
 
-  if (echo < 200) {
-    edgeDetected = true;
-    return 0;
-  } else if (edgeDetected) {
-    edgeDetected = false;
-    if (echo == 0) {
-      return 1;
-    } else {
-      return 2;
-    }
-  } else {
-    edgeDetected = false;
-    return 0;
+  if (noTurns) {
+    barrier = 0;
   }
-  return 0;
+
+  return barrier;
 }
 
 int checkForBarrierUP() {
   int echo = sonarUP.ping_median(2);
   int barrier = 0;
-  // TODO
+
+  if (echo < 170) {
+    edgeDetected = true;
+    barrier = 0;
+  } else if (edgeDetected) {
+    edgeDetected = false;
+    if (echo == 0) {
+      barrier = 1;
+    } else {
+      barrier = 2;
+    }
+  } else {
+    edgeDetected = false;
+    barrier = 0;
+  }
 
   if (currDisplayMode == D_GUI) {
     Serial.print("N");
     Serial.println(barrier);
   }
 
-  if (echo < 200) {
-    edgeDetected = true;
-    return 0;
-  } else if (edgeDetected) {
-    edgeDetected = false;
-    if (echo == 0) {
-      return 1;
-    } else {
-      return 2;
-    }
-  } else {
-    edgeDetected = false;
-    return 0;
+  if (noTurns) {
+    barrier = 0;
   }
-  return 0;
 
-  return 0;
+  return barrier;
 }
 
 int checkForBarrierDN() {
   int echo = sonarDN.ping_median(2);
   int barrier = 0;
-  // TODO
+
+  if (echo < 170) {
+    edgeDetected = true;
+    barrier = 0;
+  } else if (edgeDetected) {
+    edgeDetected = false;
+    if (echo == 0) {
+      barrier = 1;
+    } else {
+      barrier = 2;
+    }
+  } else {
+    edgeDetected = false;
+    barrier = 0;
+  }
 
   if (currDisplayMode == D_GUI) {
     Serial.print("S");
     Serial.println(barrier);
   }
 
-  if (echo < 200) {
-    edgeDetected = true;
-    return 0;
-  } else if (edgeDetected) {
-    edgeDetected = false;
-    if (echo == 0) {
-      return 1;
-    } else {
-      return 2;
-    }
-  } else {
-    edgeDetected = false;
-    return 0;
+  if (noTurns) {
+    barrier = 0;
   }
-  return 0;
+
+  return barrier;
 }
 
 /********** Actions ***********/
@@ -639,6 +735,47 @@ bool moveDN() {
   }
 }
 
+/* Assumes total distance of 10cm */
+bool SonarMidX() {
+  int target = 5;
+  int echo = sonarEAST.ping_median(2);
+  int distance = sonarEAST.convert_cm(echo);
+  if (echo - target > 0) {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, HIGH);
+    return false;
+  } else if (echo - target < 0) {
+    digitalWrite(X1, HIGH);
+    digitalWrite(X2, LOW);
+    return false;
+  } else {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, LOW);
+    return true;
+  }
+  return false;
+}
+
+bool SonarMidY() {
+  int target = 5;
+  int echo = sonarNORTH.ping_median(2);
+  int distance = sonarNORTH.convert_cm(echo);
+  if (echo - target > 0) {
+    digitalWrite(Y1, LOW);
+    digitalWrite(Y2, HIGH);
+    return false;
+  } else if (echo - target < 0) {
+    digitalWrite(Y1, HIGH);
+    digitalWrite(Y2, LOW);
+    return false;
+  } else {
+    digitalWrite(Y1, LOW);
+    digitalWrite(Y2, LOW);
+    return true;
+  }
+  return false;
+}
+
 bool moveMidX() {
   int target = xExtreme / 2;
   xPosition = xEncoder.read();
@@ -678,12 +815,12 @@ bool moveMidY() {
   }
 
   if (target - yPosition > 0) {
-    digitalWrite(Y1, LOW);
-    digitalWrite(Y2, HIGH);
-    return false;
-  } else if (target - yPosition < 0) {
     digitalWrite(Y1, HIGH);
     digitalWrite(Y2, LOW);
+    return false;
+  } else if (target - yPosition < 0) {
+    digitalWrite(Y1, LOW);
+    digitalWrite(Y2, HIGH);
     return false;
   } else {
     digitalWrite(Y1, LOW);
