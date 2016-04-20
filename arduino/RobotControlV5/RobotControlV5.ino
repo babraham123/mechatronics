@@ -99,6 +99,8 @@ const int S_CENTER_X = 11;
 const int S_CENTER_Y = 12;
 const int S_WAIT_VAC_X = 13;
 const int S_WAIT_VAC_Y = 14;
+const int S_SONAR_X = 15;
+const int S_SONAR_Y = 16;
 
 /********** Managers ***********/
 // A sequence of states that repeats in a loop. Manager can be started in
@@ -438,12 +440,7 @@ void loop() {
       break;
 
     case S_CENTER_X:
-      if (sonarWEST.ping() != 0) {
-        if (SonarMidX()) {
-          incrementState();
-        }
-        break;
-      } else if (moveMidX()) {
+      if (moveMidX()) {
         if (currManager == M_CALIBRATE) {
           xSonarMid = sonarWEST.ping_median(2);
         }
@@ -452,18 +449,15 @@ void loop() {
       break;
 
     case S_CENTER_Y:
-      if (sonarNORTH.ping() != 0) {
-        if (SonarMidY()) {
-          incrementState();
-        }
-        break;
-      } else if (moveMidY()) {
+      if (moveMidY()) {
         if (currManager == M_CALIBRATE) {
           ySonarMid = sonarNORTH.ping_median(2);
         }
         incrementState();
       }
       break;
+
+    case S_
 
     case S_LIFT_X_LO:
       if (liftCupsX(false)) {
@@ -521,6 +515,18 @@ void loop() {
     case S_WAIT_VAC_Y:
       if (waitVacuumY()) {
         incrementState();
+      }
+      break;
+      
+    case S_SONAR_X:
+      if(SonarMidX()) {
+         incrementState();
+      }
+      break;
+      
+    case S_SONAR_Y:
+      if(SonarMidY()) {
+         incrementState();
       }
       break;
   }
@@ -774,16 +780,14 @@ bool moveDN() {
 
 /* Assumes total distance of 10cm */
 bool SonarMidX() {
-  int target = 450;
   int echo = sonarWEST.ping_median(2);
-  int distance = sonarWEST.convert_cm(echo);
-  if (echo - target > 20) {
-    digitalWrite(X1, LOW);
-    digitalWrite(X2, HIGH);
-    return false;
-  } else if (echo - target < -20) {
+  if (echo - xSonarMid > 30) {
     digitalWrite(X1, HIGH);
     digitalWrite(X2, LOW);
+    return false;
+  } else if (echo - xSonarMid < -30) {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, HIGH);
     return false;
   } else {
     digitalWrite(X1, LOW);
@@ -794,14 +798,12 @@ bool SonarMidX() {
 }
 
 bool SonarMidY() {
-  int target = 450;
   int echo = sonarNORTH.ping_median(2);
-  int distance = sonarNORTH.convert_cm(echo);
-  if (echo - target > 20) {
+  if (echo - ySonarMid > 30) {
     digitalWrite(Y1, LOW);
     digitalWrite(Y2, HIGH);
     return false;
-  } else if (echo - target < -20) {
+  } else if (echo - ySonarMid < -30) {
     digitalWrite(Y1, HIGH);
     digitalWrite(Y2, LOW);
     return false;
