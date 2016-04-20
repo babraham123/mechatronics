@@ -173,7 +173,7 @@ const int D_DEBUG = 2;
 volatile bool limitLT, limitRT, limitUP, limitDN;
 volatile int yExtreme, yPosition, xExtreme, xPosition;
 long xSonarMid, ySonarMid;
-volatile bool edgeDetected, noTurns, xRaised, yRaised;;
+volatile bool edgeDetected, noTurns, xRaised, yRaised;
 
 void setup() {
   Serial.begin(9600);
@@ -184,6 +184,8 @@ void setup() {
   currManager = M_STOP;
   edgeDetected = false;
   noTurns = true;
+  xRaised = false;
+  yRaised = true;
 
   pinMode(pinLimLT, INPUT);
   pinMode(pinLimRT, INPUT);
@@ -456,8 +458,6 @@ void loop() {
         incrementState();
       }
       break;
-
-    case S_
 
     case S_LIFT_X_LO:
       if (liftCupsX(false)) {
@@ -875,6 +875,7 @@ bool moveMidY() {
 
 bool lowerCupsX() {
   bool left, right;
+  digitalWrite(xPump, HIGH);
 
   long echoLT = sonarLT.ping_median(2);
   long echoRT = sonarRT.ping_median(2);
@@ -928,6 +929,7 @@ bool lowerCupsX() {
 
 bool liftCupsX(bool high) {
   bool left, right;
+  digitalWrite(xPump, LOW);
 
   long echoLT = sonarLT.ping_median(2);
   long echoRT = sonarRT.ping_median(2);
@@ -962,6 +964,7 @@ bool liftCupsX(bool high) {
 
 bool lowerCupsY() {
   bool up, down;
+  digitalWrite(yPump, HIGH);
 
   long echoUP = sonarUP.ping_median(2);
   long echoDN = sonarDN.ping_median(2);
@@ -1015,7 +1018,8 @@ bool lowerCupsY() {
 
 bool liftCupsY(bool high) {
   bool up, down;
-
+  digitalWrite(yPump, LOW);
+  
   long echoUP = sonarUP.ping_median(2);
   long echoDN = sonarDN.ping_median(2);
 
