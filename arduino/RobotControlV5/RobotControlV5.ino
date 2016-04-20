@@ -1,4 +1,4 @@
-/* Icarus Window Washer, V4.0
+/* Icarus Window Washer, V5.0
    Mechatronic Design
    Roy Shin, Bereket Abraham
 */
@@ -55,8 +55,8 @@ const int echoWEST = 31;
 const int trigNORTH = 32;
 const int echoNORTH = 33;
 
-const int yValve = 40;
-const int xValve = 41;
+const int yPump = 40;
+const int xPump = 41;
 
 const int yVacuum = A0;
 const int xVacuum = A1;
@@ -195,7 +195,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(pinLimUP), hitUP, FALLING);
   attachInterrupt(digitalPinToInterrupt(pinLimDN), hitDN, FALLING);
 
-  pinMode(L1, OUTPUT);
+  pinMode(L1, OUTPUT); // default is LOW
   pinMode(L2, OUTPUT);
   pinMode(R1, OUTPUT);
   pinMode(R2, OUTPUT);
@@ -208,8 +208,8 @@ void setup() {
   pinMode(Y1, OUTPUT);
   pinMode(Y2, OUTPUT);
 
-  pinMode(yValve, OUTPUT);
-  pinMode(xValve, OUTPUT);
+  pinMode(yPump, OUTPUT);
+  pinMode(xPump, OUTPUT);
 
   stopAllMotors();
 }
@@ -329,18 +329,19 @@ void loop() {
         currManager = M_CALIBRATE;
         incrementState();
         break;
+
       // debug
       case '7':
-        digitalWrite(xValve, HIGH);
+        digitalWrite(xPump, HIGH);
         break;
       case '8':
-        digitalWrite(yValve, HIGH);
+        digitalWrite(xPump, LOW);
         break;
       case '9':
-        digitalWrite(xValve, LOW);
+        digitalWrite(yPump, HIGH);
         break;
       case '0':
-        digitalWrite(yValve, LOW);
+        digitalWrite(yPump, LOW);
         break;
       
       default:
@@ -434,46 +435,42 @@ void loop() {
       break;
 
     case S_LIFT_X_LO:
-      digitalWrite(xValve, HIGH);
+      digitalWrite(xPump, LOW);
       if (liftCupsX(false)) {
-        digitalWrite(xValve, LOW);
         incrementState();
       }
       break;
 
     case S_LIFT_X_HI:
-      digitalWrite(xValve, HIGH);
+      digitalWrite(xPump, LOW);
       if (liftCupsX(true)) {
-        digitalWrite(xValve, LOW);
         incrementState();
       }
       break;
 
     case S_LOWER_X:
-      digitalWrite(xValve, LOW);
+      digitalWrite(xPump, HIGH);
       if (lowerCupsX()) {
         incrementState();
       }
       break;
 
     case S_LIFT_Y_LO:
-      digitalWrite(yValve, HIGH);
+      digitalWrite(yPump, LOW);
       if (liftCupsY(false)) {
-        digitalWrite(yValve, LOW);
         incrementState();
       }
       break;
 
     case S_LIFT_Y_HI:
-      digitalWrite(yValve, HIGH);
+      digitalWrite(yPump, LOW);
       if (liftCupsY(true)) {
-        digitalWrite(yValve, LOW);
         incrementState();
       }
       break;
 
     case S_LOWER_Y:
-      digitalWrite(yValve, LOW);
+      digitalWrite(yPump, HIGH);
       if (lowerCupsY()) {
         incrementState();
       }
