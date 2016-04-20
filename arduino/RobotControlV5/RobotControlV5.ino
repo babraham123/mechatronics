@@ -185,7 +185,7 @@ void setup() {
   edgeDetected = false;
   noTurns = true;
   xRaised = false;
-  yRaised = true;
+  yRaised = false;
 
   pinMode(pinLimLT, INPUT);
   pinMode(pinLimRT, INPUT);
