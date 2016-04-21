@@ -49,8 +49,8 @@ const int echoWEST = 31;
 const int trigNORTH = 32;
 const int echoNORTH = 33;
 
-const int yValve = 40;
-const int xValve = 41;
+const int yPump = 40;
+const int xPump = 41;
 
 const int yVacuum = A0;
 const int xVacuum = A1;
@@ -65,9 +65,8 @@ NewPing sonarNORTH(trigNORTH, echoNORTH, 10);
 Encoder yEncoder(2, 4);
 Encoder xEncoder(3, 5);
 
-const float pressureThreshold = -7.0;
+const float pressureThreshold = 1.0;
 
-const bool longCupsVertical = true;
 // records the orientation of the robot
 // true means that the X railing (sponge holders) is vertical
 // true when the divider is vertical
@@ -144,7 +143,7 @@ int M_DIVIDER_DN[21] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_UP, S_LOWER
                         S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_CENTER_Y, -4
                        };
 
-int M_CALIBRATE[7] = {S_MOVE_DN, S_MOVE_UP, S_CENTER_Y, S_MOVE_RT, S_MOVE_LT, S_CENTER_X, -10};
+int M_CALIBRATE[7] = {S_MOVE_RT, S_MOVE_LT, S_CENTER_X, S_MOVE_DN, S_MOVE_UP, S_CENTER_Y, -10};
 //int M_CALIBRATE[4] = {S_MOVE_DN, S_MOVE_UP, S_CENTER_Y, -10};
 
 // (robot starts in upper right??)
@@ -202,9 +201,9 @@ void setup() {
   pinMode(Y1, OUTPUT);
   pinMode(Y2, OUTPUT);
 
-  pinMode(yValve, OUTPUT);
-  pinMode(xValve, OUTPUT);
-
+  pinMode(xPump, OUTPUT);
+  pinMode(yPump, OUTPUT);
+  
   stopAllMotors();
 }
 
@@ -325,16 +324,16 @@ void loop() {
         break;
       // debug
       case '7':
-        digitalWrite(xValve, HIGH);
+        digitalWrite(xPump, HIGH);
         break;
       case '8':
-        digitalWrite(yValve, HIGH);
+        digitalWrite(xPump, LOW);
         break;
       case '9':
-        digitalWrite(xValve, LOW);
+        digitalWrite(yPump, HIGH);
         break;
       case '0':
-        digitalWrite(yValve, LOW);
+        digitalWrite(yPump, LOW);
         break;
       
       default:
@@ -428,47 +427,43 @@ void loop() {
       break;
 
     case S_LIFT_X_LO:
-      digitalWrite(xValve, HIGH);
+      digitalWrite(xPump, LOW);
       if (liftCupsX(false)) {
-        digitalWrite(xValve, LOW);
         incrementState();
       }
       break;
 
     case S_LIFT_X_HI:
-      digitalWrite(xValve, HIGH);
+      digitalWrite(xPump, LOW);
       if (liftCupsX(true)) {
-        digitalWrite(xValve, LOW);
         incrementState();
       }
       break;
 
     case S_LOWER_X:
-      digitalWrite(xValve, LOW);
       if (lowerCupsX()) {
+        digitalWrite(xPump, HIGH);
         incrementState();
       }
       break;
 
     case S_LIFT_Y_LO:
-      digitalWrite(yValve, HIGH);
+      digitalWrite(yPump, LOW);
       if (liftCupsY(false)) {
-        digitalWrite(yValve, LOW);
         incrementState();
       }
       break;
 
     case S_LIFT_Y_HI:
-      digitalWrite(yValve, HIGH);
+      digitalWrite(yPump, LOW);
       if (liftCupsY(true)) {
-        digitalWrite(yValve, LOW);
         incrementState();
       }
       break;
 
     case S_LOWER_Y:
-      digitalWrite(yValve, LOW);
       if (lowerCupsY()) {
+        digitalWrite(yPump, HIGH);
         incrementState();
       }
       break;

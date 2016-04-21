@@ -71,7 +71,7 @@ NewPing sonarNORTH(trigNORTH, echoNORTH, 10);
 Encoder yEncoder(2, 4);
 Encoder xEncoder(3, 5);
 
-const float pressureThreshold = -7.0;
+const float pressureThreshold = 1.0;
 
 const bool longCupsVertical = true;
 // records the orientation of the robot
@@ -185,7 +185,7 @@ void setup() {
   edgeDetected = false;
   noTurns = true;
   xRaised = false;
-  yRaised = true;
+  yRaised = false;
 
   pinMode(pinLimLT, INPUT);
   pinMode(pinLimRT, INPUT);

@@ -27,20 +27,26 @@ void setup() {
   
   // initialize real time graphs
   vacuumX = new Graph(xyWidth, zHeight, zWidth, gHeight, "X Vacuum Pressure");
+  vacuumX.setMaxValue(20);
   vacuumY = new Graph(xyWidth, zHeight, zWidth, gHeight, "Y Vacuum Pressure");
+  vacuumY.setMaxValue(20);
   positionX = new Graph(xyWidth, zHeight, zWidth, gHeight, "X Railing Position");
   positionY = new Graph(xyWidth, zHeight, zWidth, gHeight, "Y Railing Position");
   ultrasonicN = new Graph(xyWidth, zHeight, zWidth, gHeight, "North Distance Sensor");
+  ultrasonicN.setMaxValue(1000);
   ultrasonicS = new Graph(xyWidth, zHeight, zWidth, gHeight, "South Distance Sensor");
+  ultrasonicS.setMaxValue(1000);
   ultrasonicE = new Graph(xyWidth, zHeight, zWidth, gHeight, "East Distance Sensor");
+  ultrasonicE.setMaxValue(1000);
   ultrasonicW = new Graph(xyWidth, zHeight, zWidth, gHeight, "West Distance Sensor");
+  ultrasonicW.setMaxValue(1000);
   currGraph = vacuumX;
 
   String[] ports = Serial.list();
   for (int i = 0; i < ports.length; i++) {
     println(ports[i]);
   }
-  myPort = new Serial(this, ports[1], 9600);
+  myPort = new Serial(this, ports[2], 9600);
 }
 
 void draw() {
@@ -72,9 +78,15 @@ void serialInput() {
         break;
       case 'x':
         positionX.update(nVal);
+        if (xExtreme < Integer.MAX_VALUE) {
+          winBot.xJoint = winBot.jointRange((float) nVal, (float) xExtreme);
+        }
         break;
       case 'y':
         positionY.update(nVal);
+        if (yExtreme < Integer.MAX_VALUE) {
+          winBot.yJoint = winBot.jointRange((float) nVal, (float) yExtreme);
+        }
         break;
       case 'X':
         xExtreme = nVal;
@@ -165,6 +177,9 @@ void keyPressed() {
       winBot.edgeN = !winBot.edgeN;
       currGraph.update(50);
       break;
+    case '1':
+      myPort.write('c'); 
+      break;
     default:
       println("Unknown key");
       break;
@@ -172,14 +187,14 @@ void keyPressed() {
 }
 
 void mouseInput() {
-  if (winBot.inRange(mouseX, mouseY)) {
-    winBot.xJoint = winBot.normalizeX(mouseX);
-    winBot.yJoint = winBot.normalizeY(mouseY);
-  } else if (footBot.inRange(mouseX, mouseY)) {
-    footBot.zJoint = footBot.normalizeY(mouseY);
-  } else {
-    // do something in the remaining space
-  }
+//   if (winBot.inRange(mouseX, mouseY)) {
+//     winBot.xJoint = winBot.normalizeX(mouseX);
+//     winBot.yJoint = winBot.normalizeY(mouseY);
+//   } else if (footBot.inRange(mouseX, mouseY)) {
+//     footBot.zJoint = footBot.normalizeY(mouseY);
+//   } else {
+//     // do something in the remaining space
+//   }
 }
 
 abstract class Mechanism {
@@ -408,4 +423,3 @@ class Graph {
     scale = (h-30) / (float) maxValue;
   }
 }
-
