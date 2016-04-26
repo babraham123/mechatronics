@@ -1,13 +1,14 @@
-/* Icarus Window Washer, V6.0
+/* Icarus Window Washer, V6
    Mechatronic Design
    Roy Shin, Bereket Abraham
 */
 
 /* Manual Control Scheme
 
-   Movement: WASD
+   Movement: WASD, x/y centers X/Y
    X legs: i to raise, k to lower
    Y legs: o to raise, l to lower
+   Pressure: p to display pressure
 */
 
 #include <NewPing.h>
@@ -50,21 +51,21 @@ const int echoWEST = 31;
 const int trigNORTH = 32;
 const int echoNORTH = 33;
 
-const int yPump = 40;
-const int xPump = 41;
+const int xPump = 45;
+const int yPump = 44;
 
 const int yVacuum = A0;
 const int xVacuum = A1;
 
-NewPing sonarLT(trigLT, echoLT, 8);
-NewPing sonarRT(trigRT, echoRT, 8);
-NewPing sonarUP(trigUP, echoUP, 8);
-NewPing sonarDN(trigDN, echoDN, 8);
-NewPing sonarWEST(trigWEST, echoWEST, 10);
-NewPing sonarNORTH(trigNORTH, echoNORTH, 10);
+NewPing sonarLT(trigLT, echoLT, 7);
+NewPing sonarRT(trigRT, echoRT, 7);
+NewPing sonarUP(trigUP, echoUP, 7);
+NewPing sonarDN(trigDN, echoDN, 7);
+NewPing sonarWEST(trigWEST, echoWEST, 15);
+NewPing sonarNORTH(trigNORTH, echoNORTH, 15);
 
-const float pressureThreshold = 1.0;
-
+const float pressureThreshold = -1.0;
+const bool longCupsVertical = true;
 // records the orientation of the robot
 // true means that the X railing (sponge holders) is vertical
 // true when the divider is vertical
@@ -73,61 +74,62 @@ const float pressureThreshold = 1.0;
 // Performs actions and state transitions. State can override its manager
 // in case of failure / unexpected conditions. State can transition to a
 // different manager as well.
-volatile int currState;
-volatile unsigned long stateCounter; // # of cycles since currState started
+int currState;
+unsigned long stateCounter; // # of cycles since currState started
 const int S_MOVE_LT = 0;
 const int S_MOVE_RT = 1;
 const int S_MOVE_UP = 2;
 const int S_MOVE_DN = 3;
 const int S_LOWER_X = 4;
-const int S_LIFT_X_LO = 5;
+const int S_LIFT_X = 5;
 const int S_LIFT_X_HI = 6;
 const int S_LOWER_Y = 7;
-const int S_LIFT_Y_LO = 8;
+const int S_LIFT_Y = 8;
 const int S_LIFT_Y_HI = 9;
 const int S_STOP_ALL = 10;
 const int S_CENTER_X = 11;
 const int S_CENTER_Y = 12;
 const int S_WAIT_VAC_X = 13;
 const int S_WAIT_VAC_Y = 14;
+const int S_SET_CUPS = 15;
 
 /********** Managers ***********/
 // A sequence of states that repeats in a loop. Manager can be started in
 // the middle of a sequence
-volatile int *currManager;
-volatile int currIndex;
+int *currManager;
+int currIndex;
 // linear motion
-int M_TRANSLATE_LT[10] = {S_CENTER_Y, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_LT, -1}; // loops back around
-int M_TRANSLATE_RT[10] = {S_CENTER_Y, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT, -2};
-int M_TRANSLATE_UP[10] = {S_CENTER_X, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_UP, -3};
-int M_TRANSLATE_DN[10] = {S_CENTER_X, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN, -4};
-int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X_LO, S_MOVE_RT, S_LOWER_X, S_LIFT_Y_LO, S_MOVE_LT, -5};
+int M_TRANSLATE_LT[10] = {S_CENTER_Y, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_LT, -1}; // loops back around
+int M_TRANSLATE_RT[9] = {S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, S_LOWER_Y, -2};
+int M_TRANSLATE_UP[10] = {S_CENTER_X, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_UP, -3};
+int M_TRANSLATE_DN[10] = {S_CENTER_X, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, -4};
+int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_LIFT_Y, S_MOVE_LT, -5};
 
 // turns, robot zigzags against divider
 // when moving down, if barrier transition to linear motion
-int M_TURN_X_LR[35] = {S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_CENTER_X, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO,
-                       S_MOVE_DN, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN,
-                       S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN, S_LOWER_X,
-                       S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_CENTER_Y, -2
+int M_TURN_X_LR[35] = {S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_CENTER_X, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,
+                       S_MOVE_DN, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN,
+                       S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, S_LOWER_X,
+                       S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_CENTER_Y, -2
                       }; // M_TRANSLATE_RT
 
-int M_TURN_X_RL[35] = {S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_CENTER_X, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO,
-                       S_MOVE_DN, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN,
-                       S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_DN, S_LOWER_X,
-                       S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_CENTER_Y, -1
+int M_TURN_X_RL[35] = {S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_CENTER_X, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X,
+                       S_MOVE_DN, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN,
+                       S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, S_LOWER_X,
+                       S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_CENTER_Y, -1
                       }; // M_TRANSLATE_LT
 
 // turns, robot zigzags with divider (not used)
-int M_TURN_Y_LR[35] = {S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_CENTER_Y, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO,
-                       S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT,
-                       S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT, S_LOWER_Y,
-                       S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_CENTER_X, -3
+int M_TURN_Y_LR[35] = {S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_CENTER_Y, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,
+                       S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT,
+                       S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, S_LOWER_Y,
+                       S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_CENTER_X, -3
                       }; // M_TRANSLATE_UP
 
-int M_TURN_Y_RL[35] = {S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_CENTER_Y, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO,
-                       S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT,
-                       S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_MOVE_RT, S_LOWER_Y,
-                       S_WAIT_VAC_Y, S_LIFT_X_LO, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_LO, S_CENTER_X, -4
+int M_TURN_Y_RL[35] = {S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_CENTER_Y, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y,
+                       S_MOVE_RT, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT,
+                       S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, S_LOWER_Y,
+                       S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_CENTER_X, -4
                       }; // M_TRANSLATE_DN
 
 // TODO: Ishit talk to Roy
@@ -141,27 +143,26 @@ int M_DIVIDER_DN[21] = {S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_MOVE_UP, S_LOWER
                         S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y_HI, S_CENTER_Y, -4
                        };
 
-int M_CALIBRATE[7] = {S_MOVE_RT, S_MOVE_LT, S_CENTER_X, S_MOVE_DN, S_MOVE_UP, S_CENTER_Y, -10};
-//int M_CALIBRATE[4] = {S_MOVE_DN, S_MOVE_UP, S_CENTER_Y, -10};
+int M_CALIBRATE[9] = {S_SET_CUPS, S_LIFT_X, S_MOVE_DN, S_MOVE_UP, S_CENTER_Y, S_MOVE_RT, S_MOVE_LT, S_CENTER_X, -10};
 
-// (robot starts in upper left??)
+// (robot starts in upper right??)
 int M_STOP[2] = {S_STOP_ALL, -10};
 // do not change order, only append to the end
-int *MANAGERS[12] = {M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN, M_DEBUG_LT, 
-                     M_TURN_X_LR, M_TURN_X_RL, M_TURN_Y_LR, M_TURN_Y_RL, M_STOP, M_DIVIDER_LT, M_DIVIDER_DN};
+int *MANAGERS[12] = {M_TRANSLATE_LT, M_TRANSLATE_RT, M_TRANSLATE_UP, M_TRANSLATE_DN, M_DEBUG_LT,
+                     M_TURN_X_LR, M_TURN_X_RL, M_TURN_Y_LR, M_TURN_Y_RL, M_STOP, M_DIVIDER_LT, M_DIVIDER_DN
+                    };
 
 /********** Display Modes ***********/
 // Determines what is outputted to the Serial port by the actions
-volatile int currDisplayMode;
+int currDisplayMode;
 const int D_NONE = 0;
 const int D_GUI = 1;
 const int D_DEBUG = 2;
 
 /* Global Variables */
-volatile bool limitLT, limitRT, limitUP, limitDN;
-volatile int yExtreme, yPosition, xExtreme, xPosition;
-long xSonarMid, ySonarMid;
-volatile bool edgeDetected, noTurns;
+int xLow, xPos, xHigh, yLow, yPos, yHigh;
+int ltLow, rtLow, upLow, dnLow;
+
 
 void setup() {
   Serial.begin(9600);
@@ -170,21 +171,21 @@ void setup() {
   currIndex = 0;
   stateCounter = 0;
   currManager = M_STOP;
-  edgeDetected = false;
-  noTurns = true;
 
-  pinMode(pinLimLT, INPUT);
-  pinMode(pinLimRT, INPUT);
-  pinMode(pinLimUP, INPUT);
-  pinMode(pinLimDN, INPUT);
-  pinMode(pinLimN, INPUT);
-  pinMode(pinLimS, INPUT);
-  digitalWrite(pinLimLT, HIGH);
-  digitalWrite(pinLimRT, HIGH);
-  digitalWrite(pinLimUP, HIGH);
-  digitalWrite(pinLimDN, HIGH);
-  digitalWrite(pinLimN, HIGH);
-  digitalWrite(pinLimS, HIGH);
+  xLow = 999;
+  xHigh = 0;
+  yLow = 999;
+  yHigh = 0;
+
+  pinMode(4, OUTPUT);
+  digitalWrite(4, LOW);
+
+  pinMode(pinLimLT, INPUT_PULLUP);
+  pinMode(pinLimRT, INPUT_PULLUP);
+  pinMode(pinLimUP, INPUT_PULLUP);
+  pinMode(pinLimDN, INPUT_PULLUP);
+  pinMode(pinLimN, INPUT_PULLUP);
+  pinMode(pinLimS, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(pinLimLT), hitLT, FALLING);
   attachInterrupt(digitalPinToInterrupt(pinLimRT), hitRT, FALLING);
   attachInterrupt(digitalPinToInterrupt(pinLimUP), hitUP, FALLING);
@@ -196,10 +197,12 @@ void setup() {
   pinMode(L2, OUTPUT);
   pinMode(R1, OUTPUT);
   pinMode(R2, OUTPUT);
+
   pinMode(U1, OUTPUT);
   pinMode(U2, OUTPUT);
   pinMode(D1, OUTPUT);
   pinMode(D2, OUTPUT);
+
   pinMode(X1, OUTPUT);
   pinMode(X2, OUTPUT);
   pinMode(Y1, OUTPUT);
@@ -207,16 +210,14 @@ void setup() {
 
   pinMode(xPump, OUTPUT);
   pinMode(yPump, OUTPUT);
-  
+
   stopAllMotors();
 }
 
 void loop() {
-  stateCounter++;
-
   /********** Manual Control ***********/
   if (Serial.available() > 0) {
-    switch (Serial.read()) {  
+    switch (Serial.read()) {
       case 'a':
         currIndex = -1;
         currManager = M_TRANSLATE_LT;
@@ -254,27 +255,31 @@ void loop() {
         break;
 
       case '1':
+        Serial.println("Move Lt Manual");
         currState = S_MOVE_LT;
         currManager = M_STOP;
         break;
 
       case '2':
+        Serial.println("Move Rt Manual");
         currState = S_MOVE_RT;
         currManager = M_STOP;
         break;
 
       case '3':
+        Serial.println("Move Up Manual");
         currState = S_MOVE_UP;
         currManager = M_STOP;
         break;
 
       case '4':
+        Serial.println("Move Dn Manual");
         currState = S_MOVE_DN;
         currManager = M_STOP;
         break;
 
       case 'i':
-        currState = S_LIFT_X_HI;
+        currState = S_LIFT_X;
         currManager = M_STOP;
         break;
 
@@ -284,7 +289,7 @@ void loop() {
         break;
 
       case 'o':
-        currState = S_LIFT_Y_LO;
+        currState = S_LIFT_Y;
         currManager = M_STOP;
         break;
 
@@ -326,20 +331,27 @@ void loop() {
         currManager = M_CALIBRATE;
         incrementState();
         break;
-      // debug
+
       case '7':
         digitalWrite(xPump, HIGH);
         break;
+
       case '8':
         digitalWrite(xPump, LOW);
         break;
+
       case '9':
         digitalWrite(yPump, HIGH);
         break;
+
       case '0':
         digitalWrite(yPump, LOW);
         break;
-      
+
+      case '5':
+        setCupHeight();
+        break;
+
       default:
         currIndex = -1;
         currState = S_STOP_ALL;
@@ -350,95 +362,50 @@ void loop() {
   }
 
   /********** States and Transitions ***********/
-  int barrierDetect = 0;
   switch (currState) {
     case S_MOVE_LT:
-      barrierDetect = checkForBarrierRT();
-      if (barrierDetect == 1) {
-        currIndex = -1;
-        currManager = M_TURN_X_RL;
+      if (moveLT()) {
         incrementState();
-      } else if (barrierDetect == 2) {
-        currIndex = -1;
-        currManager = M_DIVIDER_LT;
-        incrementState();
-      } else {
-        if (moveLT()) {
-          incrementState();
-        }
       }
       break;
 
     case S_MOVE_RT:
-      barrierDetect = checkForBarrierLT();
-      if (barrierDetect == 1) {
-        currIndex = -1;
-        currManager = M_TURN_X_LR;
+      if (moveRT()) {
         incrementState();
-      } else if (barrierDetect == 2) {
-        currIndex = -1;
-        currManager = M_DIVIDER_LT;
-        incrementState();
-      } else {
-        if (moveRT()) {
-          incrementState();
-        }
       }
       break;
 
     case S_MOVE_UP:
-      barrierDetect = checkForBarrierDN();
-      if (barrierDetect == 1) {
-        currIndex = -1;
-        currManager = M_STOP;
+      if (moveUP()) {
         incrementState();
-      } else {
-        if (moveUP()) {
-          incrementState();
-        }
       }
       break;
 
     case S_MOVE_DN:
-      barrierDetect = checkForBarrierUP();
-      if (barrierDetect == 1) {
-        currIndex = -1;
-        currManager = M_STOP;
+      if (moveDN()) {
         incrementState();
-      } else {
-        if (moveDN()) {
-          incrementState();
-        }
       }
       break;
 
     case S_CENTER_X:
-      if (moveMidX()) {
-        if (currManager == M_CALIBRATE) {
-          xSonarMid = sonarWEST.ping_median(2);
-        }
+      if (SonarMidX()) {
         incrementState();
       }
       break;
 
     case S_CENTER_Y:
-      if (moveMidY()) {
-        if (currManager == M_CALIBRATE) {
-          ySonarMid = sonarNORTH.ping_median(2);
-        }
+      if (SonarMidY()) {
         incrementState();
       }
       break;
 
-    case S_LIFT_X_LO:
-      digitalWrite(xPump, LOW);
+    case S_LIFT_X:
       if (liftCupsX(false)) {
         incrementState();
       }
       break;
 
     case S_LIFT_X_HI:
-      digitalWrite(xPump, LOW);
       if (liftCupsX(true)) {
         incrementState();
       }
@@ -446,20 +413,17 @@ void loop() {
 
     case S_LOWER_X:
       if (lowerCupsX()) {
-        digitalWrite(xPump, HIGH);
         incrementState();
       }
       break;
 
-    case S_LIFT_Y_LO:
-      digitalWrite(yPump, LOW);
+    case S_LIFT_Y:
       if (liftCupsY(false)) {
         incrementState();
       }
       break;
 
     case S_LIFT_Y_HI:
-      digitalWrite(yPump, LOW);
       if (liftCupsY(true)) {
         incrementState();
       }
@@ -467,7 +431,6 @@ void loop() {
 
     case S_LOWER_Y:
       if (lowerCupsY()) {
-        digitalWrite(yPump, HIGH);
         incrementState();
       }
       break;
@@ -488,12 +451,13 @@ void loop() {
         incrementState();
       }
       break;
+
   }
+  stateCounter++;
   delay(35);
 }
 
 /********** State Machine Helpers ***********/
-
 void incrementState() {
   currIndex++;
   currState = *(currManager + currIndex);
@@ -505,132 +469,7 @@ void incrementState() {
   stateCounter = 0;
 }
 
-// 0 = nothing, 1 = edge, 2 = divider
-int checkForBarrierRT() {
-  int echo = sonarRT.ping_median(2);
-  int barrier = 0;
-
-  if (echo < 170) {
-    edgeDetected = true;
-    barrier = 0;
-  } else if (edgeDetected) {
-    edgeDetected = false;
-    if (echo == 0) {
-      barrier = 1;
-    } else {
-      barrier = 2;
-    }
-  } else {
-    edgeDetected = false;
-    barrier = 0;
-  }
-
-  if (currDisplayMode == D_GUI) {
-    Serial.print("E");
-    Serial.println(barrier);
-  }
-  if (noTurns) {
-    barrier = 0;
-  }
-
-  return barrier;
-}
-
-int checkForBarrierLT() {
-  int echo = sonarLT.ping_median(2);
-  int barrier = 0;
-
-  if (echo < 170) {
-    edgeDetected = true;
-    barrier = 0;
-  } else if (edgeDetected) {
-    edgeDetected = false;
-    if (echo == 0) {
-      barrier = 1;
-    } else {
-      barrier = 2;
-    }
-  } else {
-    edgeDetected = false;
-    barrier = 0;
-  }
-
-  if (currDisplayMode == D_GUI) {
-    Serial.print("W");
-    Serial.println(barrier);
-  }
-
-  if (noTurns) {
-    barrier = 0;
-  }
-
-  return barrier;
-}
-
-int checkForBarrierUP() {
-  int echo = sonarUP.ping_median(2);
-  int barrier = 0;
-
-  if (echo < 170) {
-    edgeDetected = true;
-    barrier = 0;
-  } else if (edgeDetected) {
-    edgeDetected = false;
-    if (echo == 0) {
-      barrier = 1;
-    } else {
-      barrier = 2;
-    }
-  } else {
-    edgeDetected = false;
-    barrier = 0;
-  }
-
-  if (currDisplayMode == D_GUI) {
-    Serial.print("N");
-    Serial.println(barrier);
-  }
-
-  if (noTurns) {
-    barrier = 0;
-  }
-
-  return barrier;
-}
-
-int checkForBarrierDN() {
-  int echo = sonarDN.ping_median(2);
-  int barrier = 0;
-
-  if (echo < 170) {
-    edgeDetected = true;
-    barrier = 0;
-  } else if (edgeDetected) {
-    edgeDetected = false;
-    if (echo == 0) {
-      barrier = 1;
-    } else {
-      barrier = 2;
-    }
-  } else {
-    edgeDetected = false;
-    barrier = 0;
-  }
-
-  if (currDisplayMode == D_GUI) {
-    Serial.print("S");
-    Serial.println(barrier);
-  }
-
-  if (noTurns) {
-    barrier = 0;
-  }
-
-  return barrier;
-}
-
 /********** Actions ***********/
-
 bool waitVacuumX() {
   int sensor = analogRead(xVacuum);
   float voltage = sensor * (5.0 / 1023.0);
@@ -666,10 +505,9 @@ bool waitVacuumY() {
 }
 
 bool moveLT() {
-  if (currDisplayMode == D_GUI) {
-    // xPosition = xEncoder.read();
-    // Serial.print("x");
-    // Serial.println(xPosition);
+  int echo = sonarWEST.ping_median(3);
+  if ((echo < xLow) && (echo != 0)) {
+    xLow = echo;
   }
 
   if (digitalRead(pinLimLT) == HIGH) {
@@ -684,10 +522,9 @@ bool moveLT() {
 }
 
 bool moveRT() {
-  if (currDisplayMode == D_GUI) {
-    // xPosition = xEncoder.read();
-    // Serial.print("x");
-    // Serial.println(xPosition);
+  int echo = sonarWEST.ping_median(3);
+  if ((echo > xHigh) && (echo != 0)) {
+    xHigh = echo;
   }
 
   if (digitalRead(pinLimRT) == HIGH) {
@@ -702,10 +539,9 @@ bool moveRT() {
 }
 
 bool moveUP() {
-  if (currDisplayMode == D_GUI) {
-    // yPosition = yEncoder.read();
-    // Serial.print("y");
-    // Serial.println(yPosition);
+  int echo = sonarNORTH.ping_median(3);
+  if ((echo > yHigh) && (echo != 0)) {
+    yHigh = echo;
   }
 
   if (digitalRead(pinLimUP) == HIGH) {
@@ -720,10 +556,9 @@ bool moveUP() {
 }
 
 bool moveDN() {
-  if (currDisplayMode == D_GUI) {
-    // yPosition = yEncoder.read();
-    // Serial.print("y");
-    // Serial.println(yPosition);
+  int echo = sonarNORTH.ping_median(3);
+  if ((echo < yLow) && (echo != 0)) {
+    yHigh = echo;
   }
 
   if (digitalRead(pinLimDN) == HIGH) {
@@ -737,36 +572,56 @@ bool moveDN() {
   }
 }
 
-/* Assumes total distance of 10cm */
 bool SonarMidX() {
-  int target = 300;
-  int echo = sonarWEST.ping_median(2);
-  int distance = sonarWEST.convert_cm(echo);
-  if (echo - target > 25) {
+  int echo = sonarWEST.ping_median(3);
+  if (echo == 0) {
     digitalWrite(X1, LOW);
     digitalWrite(X2, HIGH);
+    Serial.println("Error, 0 ping");
     return false;
-  } else if (echo - target < -25) {
+  }
+  int xSonarMid = (xHigh - xLow) / 2;
+  if (echo - xSonarMid > 10) {
     digitalWrite(X1, HIGH);
     digitalWrite(X2, LOW);
+    return false;
+  } else if (echo - xSonarMid < -10) {
+    digitalWrite(X1, LOW);
+    digitalWrite(X2, HIGH);
     return false;
   } else {
     digitalWrite(X1, LOW);
     digitalWrite(X2, LOW);
+    Serial.print("xLow:");
+    Serial.print(xLow);
+    Serial.print(" echo:");
+    Serial.print(echo);
+    Serial.print(" xHigh");
+    Serial.println(xHigh);
     return true;
   }
   return false;
 }
 
 bool SonarMidY() {
-  int target = 300;
-  int echo = sonarNORTH.ping_median(2);
-  int distance = sonarNORTH.convert_cm(echo);
-  if (echo - target > 25) {
+  int echo = sonarNORTH.ping_median(3);
+  Serial.print("yLow:");
+  Serial.print(yLow);
+  Serial.print(" echo:");
+  Serial.print(echo);
+  Serial.print(" yHigh:");
+  Serial.println(yHigh);
+  if (echo == 0) {
+    digitalWrite(Y1, HIGH);
+    digitalWrite(Y2, LOW);
+    return false;
+  }
+  int ySonarMid = (yHigh - yLow) / 2;
+  if (echo - ySonarMid > 10) {
     digitalWrite(Y1, LOW);
     digitalWrite(Y2, HIGH);
     return false;
-  } else if (echo - target < -25) {
+  } else if (echo - ySonarMid < -10) {
     digitalWrite(Y1, HIGH);
     digitalWrite(Y2, LOW);
     return false;
@@ -778,93 +633,38 @@ bool SonarMidY() {
   return false;
 }
 
-bool moveMidX() {
-  // int target = xExtreme / 2;
-  // xPosition = xEncoder.read();
-
-  // if (currDisplayMode == D_GUI) {
-  //   Serial.print("x");
-  //   Serial.println(xPosition);
-  // }
-
-  // if (target - xPosition > 0) {
-  //   digitalWrite(X1, HIGH);
-  //   digitalWrite(X2, LOW);
-  //   return false;
-  // } else if (target - xPosition < 0) {
-  //   digitalWrite(X1, LOW);
-  //   digitalWrite(X2, HIGH);
-  //   return false;
-  // } else {
-  //   digitalWrite(X1, LOW);
-  //   digitalWrite(X2, LOW);
-
-  //   if (currDisplayMode == D_GUI) {
-  //     Serial.print("X");
-  //     Serial.println(xExtreme);
-  //   }
-  //   return true;
-  // }
-  return true;
-}
-
-bool moveMidY() {
-  // int target = yExtreme / 2;
-  // yPosition = yEncoder.read();
-
-  // if (currDisplayMode == D_GUI) {
-  //   Serial.print("y");
-  //   Serial.println(yPosition);
-  // }
-
-  // if (target - yPosition > 0) {
-  //   digitalWrite(Y1, HIGH);
-  //   digitalWrite(Y2, LOW);
-  //   return false;
-  // } else if (target - yPosition < 0) {
-  //   digitalWrite(Y1, LOW);
-  //   digitalWrite(Y2, HIGH);
-  //   return false;
-  // } else {
-  //   digitalWrite(Y1, LOW);
-  //   digitalWrite(Y2, LOW);
-
-  //   if (currDisplayMode == D_GUI) {
-  //     Serial.print("Y");
-  //     Serial.println(yExtreme);
-  //   }
-  //   return true;
-  // }
+bool setCupHeight() {
+  ltLow = sonarLT.ping_median(3);
+  rtLow = sonarRT.ping_median(3);
+  upLow = sonarUP.ping_median(3);
+  dnLow = sonarDN.ping_median(3);
+  Serial.println("Cups set at: ");
+  Serial.print("LT: ");
+  Serial.print(ltLow);
+  Serial.print(" RT: ");
+  Serial.println(rtLow);
+  Serial.print("UP: ");
+  Serial.print(upLow);
+  Serial.print(" DN: ");
+  Serial.println(dnLow);
   return true;
 }
 
 bool lowerCupsX() {
   bool left, right;
+  digitalWrite(xPump, HIGH);
 
   long echoLT = sonarLT.ping_median(2);
   long echoRT = sonarRT.ping_median(2);
 
-  if (currDisplayMode == D_DEBUG) {
-    Serial.print("LT:");
-    Serial.print(echoLT);
-    Serial.print("us RT:");
-    Serial.print(echoRT);
-    Serial.println("us");
-  } else if (currDisplayMode == D_GUI) {
-    Serial.print("e");
-    Serial.println(echoRT);
-    Serial.print("w");
-    Serial.println(echoLT);
-  }
-
-  if ((echoLT < 255) && (echoRT > 265)) {
-    analogWrite(L1, 255 / 8);
+  if ((echoLT < ltLow) && (echoRT > rtLow)) {
+    digitalWrite(L1, LOW);
     digitalWrite(L2, HIGH);
-    analogWrite(R1, 255 / 8);
+    digitalWrite(R1, HIGH);
     digitalWrite(R2, LOW);
     return false;
-  } else if (echoLT > 260) {
-    analogWrite(L1, 255 / 16);
+  } else if (echoLT > (ltLow + 8)) {
+    digitalWrite(L1, LOW);
     digitalWrite(L2, HIGH);
     left = false;
   } else {
@@ -873,14 +673,14 @@ bool lowerCupsX() {
     left = true;
   }
 
-  if ((echoRT < 255) && (echoLT > 265)) {
-    analogWrite(L1, 255 / 8);
+  if ((echoRT < rtLow) && (echoLT > ltLow)) {
+    digitalWrite(L1, HIGH);
     digitalWrite(L2, LOW);
-    analogWrite(R1, 255 / 8);
+    digitalWrite(R1, LOW);
     digitalWrite(R2, HIGH);
     return false;
-  } else if (echoRT > 260) {
-    analogWrite(R1, 255 / 16);
+  } else if (echoRT > (rtLow + 8)) {
+    digitalWrite(R1, LOW);
     digitalWrite(R2, HIGH);
     right = false;
   } else {
@@ -892,102 +692,102 @@ bool lowerCupsX() {
 }
 
 bool liftCupsX(bool high) {
-  long echoLT = sonarLT.ping_median(2);
-  long echoRT = sonarRT.ping_median(2);
+  bool left, right;
+  digitalWrite(xPump, LOW);
+  if (returnPressure(true) < 6.5) {
+    return false;
+  }
 
-  if (currDisplayMode == D_DEBUG) {
-    Serial.print("LT:");
-    Serial.print(echoLT);
-    Serial.print("us RT:");
-    Serial.print(echoRT);
-    Serial.println("us");
-  } else if (currDisplayMode == D_GUI) {
-    Serial.print("e");
-    Serial.println(echoRT);
-    Serial.print("w");
-    Serial.println(echoLT);
-  }
-  digitalWrite(L1, HIGH);
-  digitalWrite(L2, LOW);
-  digitalWrite(R1, HIGH);
-  digitalWrite(R2, LOW);
-  if (high) {
-    delay(1000);
+  long echoLT = sonarLT.ping_median(3);
+  long echoRT = sonarRT.ping_median(3);
+
+  if ((echoLT < (ltLow + 10)) && (echoLT != 0)) {
+    digitalWrite(L1, HIGH);
+    digitalWrite(L2, LOW);
+    left = false;;
   } else {
-    delay(250);
+    digitalWrite(L1, LOW);
+    digitalWrite(L2, LOW);
+    left = true;
   }
-  digitalWrite(L1, LOW);
-  digitalWrite(L2, LOW);
-  digitalWrite(R1, LOW);
-  digitalWrite(R2, LOW);
-  return true;
+
+  if ((echoRT < (rtLow + 10)) && (echoRT != 0)) {
+    digitalWrite(R1, HIGH);
+    digitalWrite(R2, LOW);
+    right = false;
+  } else {
+    digitalWrite(R1, LOW);
+    digitalWrite(R2, LOW);
+    right = true;
+  }
+
+  return (left && right);
 }
 
 bool lowerCupsY() {
-  long echoUP = sonarUP.ping_median(2);
-  long echoDN = sonarDN.ping_median(2);
-  int switchN = digitalRead(pinLimN);
-  int switchS = digitalRead(pinLimS);
+  bool up, down;
+  digitalWrite(yPump, HIGH);
 
-  if (currDisplayMode == D_DEBUG) {
-    Serial.print("UP:");
-    Serial.print(echoUP);
-    Serial.print("us DN:");
-    Serial.print(echoDN);
-    Serial.println("us");
-  } else if (currDisplayMode == D_GUI) {
-    Serial.print("n");
-    Serial.println(switchN);
-    Serial.print("s");
-    Serial.println(switchS);
-  }
-
-  if (switchN == HIGH) {
+  if (digitalRead(pinLimN) == HIGH) {
     digitalWrite(U1, LOW);
     digitalWrite(U2, HIGH);
-    return false;
+    up = false;
   } else {
     digitalWrite(U1, LOW);
     digitalWrite(U2, LOW);
-    return true;
+    up = true;
   }
 
-  // if (switchS == HIGH) {
-  //   digitalWrite(D1, LOW);
-  //   digitalWrite(D2, HIGH);
-  //   return false;
-  // } else {
-  //   digitalWrite(D1, LOW);
-  //   digitalWrite(D2, LOW);
-  //   return true;
-  // }
+  if (digitalRead(pinLimS) == HIGH) {
+    digitalWrite(D1, LOW);
+    digitalWrite(D2, HIGH);
+    return false;
+  } else {
+    digitalWrite(D1, LOW);
+    digitalWrite(D2, LOW);
+    down = true;
+  }
+
+  return (up && down);
+}
+bool liftCupsY(bool high) {
+  bool up, down;
+  if (returnPressure(false) < 6.5) {
+    digitalWrite(yPump, LOW);
+    return false;
+  }
+
+  if (digitalRead(pinLimN) == LOW) {
+    digitalWrite(U1, HIGH);
+    digitalWrite(U2, LOW);
+    up = false;
+  } else {
+    digitalWrite(U1, LOW);
+    digitalWrite(U2, LOW);
+    up = true;
+  }
+
+  if (digitalRead(pinLimS) == LOW) {
+    digitalWrite(D1, HIGH);
+    digitalWrite(D2, LOW);
+    return false;
+  } else {
+    digitalWrite(D1, LOW);
+    digitalWrite(D2, LOW);
+    down = true;
+  }
+  return (up && down);
 }
 
-bool liftCupsY(bool high) {
-  long echoUP = sonarUP.ping_median(2);
-  long echoDN = sonarDN.ping_median(2);
+bool stopMotorsLR() {
+  digitalWrite(L1, LOW);
+  digitalWrite(L2, LOW);
+  digitalWrite(R1, LOW);
+  digitalWrite(R2, LOW);
+  return true;
+}
 
-  if (currDisplayMode == D_DEBUG) {
-    Serial.print("UP:");
-    Serial.print(echoUP);
-    Serial.print("us DN:");
-    Serial.print(echoDN);
-    Serial.println("us");
-  } else if (currDisplayMode == D_GUI) {
-    Serial.print("n");
-    Serial.println(echoUP);
-    Serial.print("s");
-    Serial.println(echoDN);
-  }
-  digitalWrite(U1, HIGH);
-  digitalWrite(U2, LOW);
-  digitalWrite(D1, HIGH);
-  digitalWrite(D2, LOW);
-  if (high) {
-    delay(1000);
-  } else {
-    delay(400);
-  }
+bool stopMotorsUD() {
   digitalWrite(U1, LOW);
   digitalWrite(U2, LOW);
   digitalWrite(D1, LOW);
@@ -995,46 +795,43 @@ bool liftCupsY(bool high) {
   return true;
 }
 
-
-void stopAllMotors() {
-  digitalWrite(L1, LOW);
-  digitalWrite(L2, LOW);
-  digitalWrite(R1, LOW);
-  digitalWrite(R2, LOW);
-  digitalWrite(U1, LOW);
-  digitalWrite(U2, LOW);
-  digitalWrite(D1, LOW);
-  digitalWrite(D2, LOW);
+bool stopMotorsXY() {
   digitalWrite(X1, LOW);
   digitalWrite(X2, LOW);
   digitalWrite(Y1, LOW);
   digitalWrite(Y2, LOW);
-  return;
+  return true;
+}
+
+bool stopAllMotors() {
+  if (stopMotorsXY()) {
+    if (stopMotorsLR()) {
+      if (stopMotorsUD()) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /********** Interrupt Functions ***********/
-
 void hitLT() {
-  digitalWrite(X1, LOW);
-  digitalWrite(X2, LOW);
+  stopMotorsXY();
   return;
 }
 
 void hitRT() {
-  digitalWrite(X1, LOW);
-  digitalWrite(X2, LOW);
+  stopMotorsXY();
   return;
 }
 
 void hitUP() {
-  digitalWrite(Y1, LOW);
-  digitalWrite(Y2, LOW);
+  stopMotorsXY();
   return;
 }
 
 void hitDN() {
-  digitalWrite(Y1, LOW);
-  digitalWrite(Y2, LOW);
+  stopMotorsXY();
   return;
 }
 
@@ -1051,6 +848,17 @@ void hitS() {
 }
 
 /********** miscellaneous ***********/
+float returnPressure(bool x) {
+  int sensor;
+  if (x) {
+    sensor = analogRead(xVacuum);
+  } else {
+    sensor = analogRead(yVacuum);
+  }
+  float voltage = sensor * (5.0 / 1023.0);
+  float pressure = (voltage - 2.82) / 0.054;
+  return pressure;
+}
 
 void displayPressure() {
   int sensor1 = analogRead(yVacuum);
@@ -1067,23 +875,23 @@ void displayPressure() {
 }
 
 void displayUltrasonic() {
-  long echoLT = sonarLT.ping_median(2);
-  long echoRT = sonarRT.ping_median(2);
-  long echoUP = sonarUP.ping_median(2);
-  long echoDN = sonarDN.ping_median(2);
-  long echoN = sonarNORTH.ping_median(2);
-  long echoW = sonarWEST.ping_median(2);
-  Serial.print("LT=");
+  long echoLT = sonarLT.ping_median(3);
+  long echoRT = sonarRT.ping_median(3);
+  long echoUP = sonarUP.ping_median(3);
+  long echoDN = sonarDN.ping_median(3);
+  long echoN = sonarNORTH.ping_median(3);
+  long echoW = sonarWEST.ping_median(3);
+  Serial.print("LT = ");
   Serial.print(echoLT);
-  Serial.print(" RT=");
-  Serial.print(echoRT);
-  Serial.print(" UP=");
+  Serial.print(" RT = ");
+  Serial.println(echoRT);
+  Serial.print("UP = ");
   Serial.print(echoUP);
-  Serial.print(" DN=");
-  Serial.print(echoDN);
-  Serial.print(" N=");
+  Serial.print(" DN = ");
+  Serial.println(echoDN);
+  Serial.print("N = ");
   Serial.print(echoN);
-  Serial.print(" W=");
+  Serial.print(" W = ");
   Serial.println(echoW);
   return;
 }
