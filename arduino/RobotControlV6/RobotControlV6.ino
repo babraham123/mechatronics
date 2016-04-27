@@ -100,7 +100,7 @@ int *currManager;
 int currIndex;
 // linear motion
 int M_TRANSLATE_LT[10] = {S_CENTER_Y, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_LT, -1}; // loops back around
-int M_TRANSLATE_RT[9] = {S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, S_LOWER_Y, -2};
+int M_TRANSLATE_RT[10] = {S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_LT, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_RT, S_CENTER_Y, S_LOWER_Y, -2};
 int M_TRANSLATE_UP[10] = {S_CENTER_X, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_DN, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_UP, -3};
 int M_TRANSLATE_DN[10] = {S_CENTER_X, S_LOWER_X, S_WAIT_VAC_X, S_LIFT_Y, S_MOVE_UP, S_LOWER_Y, S_WAIT_VAC_Y, S_LIFT_X, S_MOVE_DN, -4};
 int M_DEBUG_LT[7] = {S_LOWER_Y, S_LIFT_X, S_MOVE_RT, S_LOWER_X, S_LIFT_Y, S_MOVE_LT, -5};
@@ -540,8 +540,8 @@ bool moveRT() {
 
 bool moveUP() {
   int echo = sonarNORTH.ping_median(3);
-  if ((echo > yHigh) && (echo != 0)) {
-    yHigh = echo;
+  if ((echo < yLow) && (echo != 0)) {
+    yLow = echo;
   }
 
   if (digitalRead(pinLimUP) == HIGH) {
@@ -557,7 +557,7 @@ bool moveUP() {
 
 bool moveDN() {
   int echo = sonarNORTH.ping_median(3);
-  if ((echo < yLow) && (echo != 0)) {
+  if ((echo > yHigh) && (echo != 0)) {
     yHigh = echo;
   }
 
@@ -616,12 +616,12 @@ bool SonarMidY() {
     digitalWrite(Y2, LOW);
     return false;
   }
-  int ySonarMid = (yHigh - yLow) / 2;
-  if (echo - ySonarMid > 10) {
+  int ySonarMid = (yHigh - yLow) / 2 + 50;
+  if (echo - ySonarMid > 5) {
     digitalWrite(Y1, LOW);
     digitalWrite(Y2, HIGH);
     return false;
-  } else if (echo - ySonarMid < -10) {
+  } else if (echo - ySonarMid < -5) {
     digitalWrite(Y1, HIGH);
     digitalWrite(Y2, LOW);
     return false;
@@ -653,9 +653,13 @@ bool setCupHeight() {
 bool lowerCupsX() {
   bool left, right;
   digitalWrite(xPump, HIGH);
+  if (returnPressure(true) < -1.0) {
+    stopMotorsLR();
+    return true;
+  }
 
-  long echoLT = sonarLT.ping_median(2);
-  long echoRT = sonarRT.ping_median(2);
+  long echoLT = sonarLT.ping_median(3);
+  long echoRT = sonarRT.ping_median(3);
 
   if ((echoLT < ltLow) && (echoRT > rtLow)) {
     digitalWrite(L1, LOW);
@@ -693,8 +697,9 @@ bool lowerCupsX() {
 
 bool liftCupsX(bool high) {
   bool left, right;
-  digitalWrite(xPump, LOW);
   if (returnPressure(true) < 6.5) {
+    stopMotorsLR();
+    digitalWrite(xPump, LOW);
     return false;
   }
 
@@ -726,9 +731,24 @@ bool liftCupsX(bool high) {
 
 bool lowerCupsY() {
   bool up, down;
+  if (returnPressure(false) < -1.0) {
+    stopMotorsUD();
+    return true;
+  }
+  int switchN = digitalRead(pinLimN);
+  int switchS = digitalRead(pinLimS);
+  long echoUP = sonarUP.ping_median(3);
+  long echoDN = sonarDN.ping_median(3);
+
   digitalWrite(yPump, HIGH);
 
-  if (digitalRead(pinLimN) == HIGH) {
+  if ((echoUP < upLow) > (echoDN > dnLow)) {
+    digitalWrite(U1, LOW);
+    digitalWrite(U2, HIGH);
+    digitalWrite(D1, HIGH);
+    digitalWrite(D2, LOW);
+    return false;
+  } else if ((echoUP > (upLow + 8)) && (switchN == HIGH)) {
     digitalWrite(U1, LOW);
     digitalWrite(U2, HIGH);
     up = false;
@@ -738,10 +758,16 @@ bool lowerCupsY() {
     up = true;
   }
 
-  if (digitalRead(pinLimS) == HIGH) {
+  if ((echoDN < dnLow) && (echoUP > upLow)) {
+    digitalWrite(U1, HIGH);
+    digitalWrite(U2, LOW);
     digitalWrite(D1, LOW);
     digitalWrite(D2, HIGH);
     return false;
+  } else if ((echoDN > (dnLow + 8)) && (switchS == HIGH)) {
+    digitalWrite(D1, LOW);
+    digitalWrite(D2, HIGH);
+    down = false;
   } else {
     digitalWrite(D1, LOW);
     digitalWrite(D2, LOW);
@@ -750,33 +776,22 @@ bool lowerCupsY() {
 
   return (up && down);
 }
+
 bool liftCupsY(bool high) {
   bool up, down;
+
   if (returnPressure(false) < 6.5) {
+    stopMotorsUD();
     digitalWrite(yPump, LOW);
     return false;
   }
-
-  if (digitalRead(pinLimN) == LOW) {
-    digitalWrite(U1, HIGH);
-    digitalWrite(U2, LOW);
-    up = false;
-  } else {
-    digitalWrite(U1, LOW);
-    digitalWrite(U2, LOW);
-    up = true;
-  }
-
-  if (digitalRead(pinLimS) == LOW) {
-    digitalWrite(D1, HIGH);
-    digitalWrite(D2, LOW);
-    return false;
-  } else {
-    digitalWrite(D1, LOW);
-    digitalWrite(D2, LOW);
-    down = true;
-  }
-  return (up && down);
+  digitalWrite(U1, HIGH);
+  digitalWrite(U2, LOW);
+  digitalWrite(D1, HIGH);
+  digitalWrite(D2, LOW);
+  delay(500);
+  stopMotorsUD();
+  return true;
 }
 
 bool stopMotorsLR() {
